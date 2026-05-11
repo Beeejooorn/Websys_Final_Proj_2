@@ -9,12 +9,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $fullname = $_POST['fullname'];
     $email = $_POST['email'];
     $course = $_POST['course'];
+    $year_level = $_POST['year_level'];
+    $contact = $_POST['contact'];
+    $address = $_POST['address'];
 
-    $sql = "UPDATE students 
-            SET fullname = '$fullname',
-                email = '$email',
-                course = '$course'
-            WHERE student_id = $student_id";
+   $sql = "UPDATE students 
+        SET fullname = '$fullname',
+            email = '$email',
+            course = '$course',
+            year_level = '$year_level',
+            contact = '$contact',
+            address = '$address'
+        WHERE student_id = $student_id";
 
     if ($conn->query($sql) === TRUE) {
         header("Location: students.php");
