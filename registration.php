@@ -8,18 +8,20 @@ function e($value) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-   $student_id = trim($_POST['student_id'] ?? '');
-   $fullname = $_POST['fullname'];
-   $email = $_POST['email'];
-   $course = $_POST['course'] ?? '';
-   $year_level = $_POST['year_level'] ?? '';
-   $contact = $_POST['contact'] ?? '';
-   $address = $_POST['address'] ?? '';
+    $student_id = trim($_POST['student_id'] ?? '');
+    $fullname = $_POST['fullname'] ?? '';
+    $email = $_POST['email'] ?? '';
+    $course = $_POST['course'] ?? '';
+    $year_level = $_POST['year_level'] ?? '';
+    $birthdate = $_POST['birthdate'] ?? '';
+    $contact = $_POST['contact'] ?? '';
+    $address = $_POST['address'] ?? '';
 
     if ($student_id === '' || !ctype_digit($student_id) || (int)$student_id <= 0) {
         $message = "Please enter a valid numeric Student ID.";
     } else {
         $student_id = (int)$student_id;
+
         $check_student = $conn->query("SELECT student_id FROM students WHERE student_id = $student_id");
 
         if ($check_student && $check_student->num_rows > 0) {
@@ -27,6 +29,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } else {
             $password_column = $conn->query("SHOW COLUMNS FROM users LIKE 'password'");
             $has_password_column = $password_column && $password_column->num_rows > 0;
+
             $sql_user = $has_password_column
                 ? "INSERT INTO users (email, password) VALUES ('$email', '')"
                 : "INSERT INTO users (email) VALUES ('$email')";
@@ -34,8 +37,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($conn->query($sql_user) === TRUE) {
                 $user_id = $conn->insert_id;
 
-               $sql_student = "INSERT INTO students (student_id, user_id, fullname, email, course, year_level, contact, address) 
-                VALUES ('$student_id', '$user_id', '$fullname', '$email', '$course', '$year_level', '$contact', '$address')";
+                $sql_student = "INSERT INTO students 
+                    (student_id, user_id, fullname, email, course, year_level, birthdate, contact, address) 
+                    VALUES 
+                    ('$student_id', '$user_id', '$fullname', '$email', '$course', '$year_level', '$birthdate', '$contact', '$address')";
 
                 if ($conn->query($sql_student) === TRUE) {
                     $message = "Student registered successfully";
@@ -55,14 +60,18 @@ $defaultCourseOptions = [
     'BS Business Administration',
     'BS Education'
 ];
+
 $courseOptions = $defaultCourseOptions;
+
 $course_sql = "
     SELECT course_name AS course_name FROM courses WHERE TRIM(course_name) <> ''
     UNION
     SELECT course AS course_name FROM students WHERE TRIM(course) <> ''
     ORDER BY course_name
 ";
+
 $course_result = $conn->query($course_sql);
+
 if ($course_result) {
     while ($course_row = $course_result->fetch_assoc()) {
         if (!in_array($course_row['course_name'], $courseOptions, true)) {
@@ -77,11 +86,15 @@ $defaultYearLevelOptions = [
     '3rd Year',
     '4th Year'
 ];
+
 $yearLevelOptions = $defaultYearLevelOptions;
+
 $yearLevelColumn = null;
+
 foreach (['year_level', 'yearlevel', 'year'] as $possibleColumn) {
     $safeColumn = $conn->real_escape_string($possibleColumn);
     $column_result = $conn->query("SHOW COLUMNS FROM students LIKE '$safeColumn'");
+
     if ($column_result && $column_result->num_rows > 0) {
         $yearLevelColumn = $possibleColumn;
         break;
@@ -90,6 +103,7 @@ foreach (['year_level', 'yearlevel', 'year'] as $possibleColumn) {
 
 if ($yearLevelColumn !== null) {
     $year_result = $conn->query("SELECT DISTINCT `$yearLevelColumn` AS year_level FROM students WHERE TRIM(`$yearLevelColumn`) <> '' ORDER BY `$yearLevelColumn`");
+
     if ($year_result) {
         while ($year_row = $year_result->fetch_assoc()) {
             if (!in_array($year_row['year_level'], $yearLevelOptions, true)) {
@@ -140,78 +154,96 @@ if ($yearLevelColumn !== null) {
         <div class="topbar-badge">Academic Portal</div>
       </header>
 
-<section class="card section-card">
+      <section class="card section-card">
 
-  <?php if ($message != "") { ?>
-  <p><?php echo e($message); ?></p>
-<?php } ?>
+        <?php if ($message != "") { ?>
+          <p><?php echo e($message); ?></p>
+        <?php } ?>
 
-  <div class="section-title">
-    <div>
-      <h3>Student Registration Form</h3>
-      <p>Structured fields grouped clearly for a clean and readable registration layout.</p>
-    </div>
-  </div>
+        <div class="section-title">
+          <div>
+            <h3>Student Registration Form</h3>
+            <p>Structured fields grouped clearly for a clean and readable registration layout.</p>
+          </div>
+        </div>
 
-  <form method="POST" action="registration.php">
-    <div class="form-section">
-      <h4>Personal Information</h4>
-      <p>Basic student details for record creation.</p>
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="fullname">Full Name</label>
-          <input id="fullname" name="fullname" type="text" placeholder="Enter full name" />
-        </div>
-        <div class="form-group">
-          <label for="studentid">Student ID</label>
-          <input id="studentid" name="student_id" type="number" min="1" step="1" placeholder="Enter student ID" required />
-        </div>
-        <div class="form-group">
-          <label for="course">Course</label>
-          <select id="course" name="course">
-            <option value="">Select course</option>
-            <?php foreach ($courseOptions as $courseOption) { ?>
-              <option value="<?php echo e($courseOption); ?>"><?php echo e($courseOption); ?></option>
-            <?php } ?>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="yearlevel">Year Level</label>
-          <select id="yearlevel" name="year_level" required>
-            <option value="">Select year level</option>
-            <?php foreach ($yearLevelOptions as $yearLevelOption) { ?>
-              <option value="<?php echo e($yearLevelOption); ?>"><?php echo e($yearLevelOption); ?></option>
-            <?php } ?>
-          </select>
-        </div>
-      </div>
-    </div>
+        <form method="POST" action="registration.php">
 
-    <div class="form-section">
-      <h4>Contact Information</h4>
-      <p>Communication details and address section.</p>
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="email">Email Address</label>
-          <input id="email" name="email" type="email" placeholder="Enter email address" />
-        </div>
-        <div class="form-group">
-          <label for="contact">Contact Number</label>
-          <input id="contact" name="contact" type="text" placeholder="Enter contact number" />
-        </div>
-        <div class="form-group full">
-          <label for="address">Address</label>
-          <textarea id="address" name="address" placeholder="Enter complete address"></textarea>
-        </div>
-      </div>
-    </div>
+          <div class="form-section">
+            <h4>Personal Information</h4>
+            <p>Basic student details for record creation.</p>
 
-    <div class="button-row">
-     <button type="submit" class="btn btn-primary">Register Student</button>
-      <button type="reset" class="btn btn-secondary">Clear Form</button>
-    </div>
-  </form>
-</section>
+            <div class="form-grid">
+
+              <div class="form-group">
+                <label for="fullname">Full Name</label>
+                <input id="fullname" name="fullname" type="text" placeholder="Enter full name" required />
+              </div>
+
+              <div class="form-group">
+                <label for="studentid">Student ID</label>
+                <input id="studentid" name="student_id" type="number" min="1" step="1" placeholder="Enter student ID" required />
+              </div>
+
+              <div class="form-group">
+                <label for="course">Course</label>
+                <select id="course" name="course" required>
+                  <option value="">Select course</option>
+                  <?php foreach ($courseOptions as $courseOption) { ?>
+                    <option value="<?php echo e($courseOption); ?>"><?php echo e($courseOption); ?></option>
+                  <?php } ?>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="yearlevel">Year Level</label>
+                <select id="yearlevel" name="year_level" required>
+                  <option value="">Select year level</option>
+                  <?php foreach ($yearLevelOptions as $yearLevelOption) { ?>
+                    <option value="<?php echo e($yearLevelOption); ?>"><?php echo e($yearLevelOption); ?></option>
+                  <?php } ?>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="birthdate">Birthdate</label>
+                <input id="birthdate" name="birthdate" type="date" required />
+              </div>
+
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4>Contact Information</h4>
+            <p>Communication details and address section.</p>
+
+            <div class="form-grid">
+
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input id="email" name="email" type="email" placeholder="Enter email address" required />
+              </div>
+
+              <div class="form-group">
+                <label for="contact">Contact Number</label>
+                <input id="contact" name="contact" type="text" placeholder="Enter contact number" />
+              </div>
+
+              <div class="form-group full">
+                <label for="address">Address</label>
+                <textarea id="address" name="address" placeholder="Enter complete address"></textarea>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="btn btn-primary">Register Student</button>
+            <button type="reset" class="btn btn-secondary">Clear Form</button>
+          </div>
+
+        </form>
+      </section>
     </main>
   </div>
 </body>
