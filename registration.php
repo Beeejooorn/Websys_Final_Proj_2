@@ -17,8 +17,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $contact = $_POST['contact'] ?? '';
     $address = $_POST['address'] ?? '';
 
-    if ($student_id === '' || !ctype_digit($student_id) || (int)$student_id <= 0) {
-        $message = "Please enter a valid numeric Student ID.";
+    if ($student_id === '' || !ctype_digit($student_id) || (int)$student_id <= 0 || (int)$student_id > 2147483647) {
+        $message = "Please enter a valid numeric Student ID between 1 and 2147483647.";
     } else {
         $student_id = (int)$student_id;
 
@@ -182,7 +182,7 @@ if ($yearLevelColumn !== null) {
 
               <div class="form-group">
                 <label for="studentid">Student ID</label>
-                <input id="studentid" name="student_id" type="number" min="1" step="1" placeholder="Enter student ID" required />
+               <input id="studentid" name="student_id" type="number" min="1" max="2147483647" step="1" placeholder="Enter student ID" required />
               </div>
 
               <div class="form-group">

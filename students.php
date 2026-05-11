@@ -22,12 +22,32 @@ foreach (['year_level', 'yearlevel', 'year'] as $possibleColumn) {
 
 $yearLevelSelect = $yearLevelColumn !== null ? ", s.`$yearLevelColumn` AS year_level" : ", NULL AS year_level";
 
+$search = trim($_GET['search'] ?? '');
+$searchSql = "";
+
+if ($search !== '') {
+    $safeSearch = $conn->real_escape_string($search);
+
+    $searchSql = "
+        WHERE s.student_id LIKE '%$safeSearch%'
+        OR s.fullname LIKE '%$safeSearch%'
+        OR s.email LIKE '%$safeSearch%'
+        OR s.course LIKE '%$safeSearch%'
+        OR s.year_level LIKE '%$safeSearch%'
+        OR s.birthdate LIKE '%$safeSearch%'
+        OR s.contact LIKE '%$safeSearch%'
+        OR s.address LIKE '%$safeSearch%'
+    ";
+}
+
 $sql = "
     SELECT s.* $yearLevelSelect,
            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
     FROM students s
+    $searchSql
     ORDER BY s.user_id DESC
 ";
+
 $result = $conn->query($sql);
 ?>
 
@@ -80,11 +100,21 @@ $result = $conn->query($sql);
   </div>
 
   <div class="table-toolbar">
-    <div class="search-shell">
-      <input type="text" placeholder="Search students by name or ID" />
-    </div>
-    <div class="topbar-badge">Database Records</div>
-  </div>
+  <form method="GET" action="students.php" class="search-shell">
+    <input 
+      type="text" 
+      name="search" 
+      value="<?php echo e($search); ?>" 
+      placeholder="Search students by name, ID, course, email, year level, or contact" 
+    />
+  </form>
+
+  <?php if ($search !== '') { ?>
+    <a href="students.php" class="btn btn-secondary">Clear Search</a>
+  <?php } ?>
+
+  <div class="topbar-badge">Database Records</div>
+</div>
 
   <div class="table-wrap">
     <table>
@@ -130,7 +160,9 @@ $result = $conn->query($sql);
     <?php } ?>
   <?php } else { ?>
     <tr>
-      <td colspan="9">No student records found.</td>
+     <td colspan="9">
+      <?php echo $search !== '' ? 'No matching students found.' : 'No student records found.'; ?>
+    </td>
     </tr>
   <?php } ?>
 </tbody>

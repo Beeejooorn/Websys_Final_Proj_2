@@ -58,7 +58,7 @@ $recentSql = "
     SELECT s.student_id, s.fullname, s.email, s.course,
            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
     FROM students s
-    ORDER BY s.student_id DESC
+    ORDER BY s.user_id DESC
     LIMIT 4
 ";
 $recentResult = $conn->query($recentSql);
