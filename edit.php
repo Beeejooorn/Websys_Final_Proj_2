@@ -94,20 +94,41 @@ if (!empty($row['course']) && !in_array($row['course'], $courseOptions, true)) {
               </div>
 
               <div class="form-group">
-                <label for="course">Course</label>
-                <select id="course" name="course">
-                  <?php foreach ($courseOptions as $courseOption) { ?>
-                    <option value="<?php echo e($courseOption); ?>" <?php if ($row['course'] == $courseOption) echo 'selected'; ?>>
-                      <?php echo e($courseOption); ?>
-                    </option>
-                  <?php } ?>
-                </select>
-              </div>
+                  <label for="course">Course</label>
+                  <select id="course" name="course">
+                    <?php foreach ($courseOptions as $courseOption) { ?>
+                      <option value="<?php echo e($courseOption); ?>" <?php if ($row['course'] == $courseOption) echo 'selected'; ?>>
+                        <?php echo e($courseOption); ?>
+                      </option>
+                    <?php } ?>
+                  </select>
+                </div>
 
-              <div class="form-group">
-                <label for="email">Email Address</label>
-                <input id="email" name="email" type="email" value="<?php echo e($row['email']); ?>" />
-              </div>
+                <div class="form-group">
+                  <label for="yearlevel">Year Level</label>
+                  <select id="yearlevel" name="year_level">
+                    <option value="">Select year level</option>
+                    <option value="1st Year" <?php if ($row['year_level'] == '1st Year') echo 'selected'; ?>>1st Year</option>
+                    <option value="2nd Year" <?php if ($row['year_level'] == '2nd Year') echo 'selected'; ?>>2nd Year</option>
+                    <option value="3rd Year" <?php if ($row['year_level'] == '3rd Year') echo 'selected'; ?>>3rd Year</option>
+                    <option value="4th Year" <?php if ($row['year_level'] == '4th Year') echo 'selected'; ?>>4th Year</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="email">Email Address</label>
+                  <input id="email" name="email" type="email" value="<?php echo e($row['email']); ?>" />
+                </div>
+
+                <div class="form-group">
+                  <label for="contact">Contact Number</label>
+                  <input id="contact" name="contact" type="text" value="<?php echo e($row['contact']); ?>" />
+                </div>
+
+                <div class="form-group full">
+                  <label for="address">Address</label>
+                  <textarea id="address" name="address"><?php echo e($row['address']); ?></textarea>
+                </div>
             </div>
           </div>
 
