@@ -114,7 +114,7 @@ $result = $conn->query($sql);
           <div class="student-name"><?php echo display_value($row['fullname']); ?></div>
           <div class="student-sub"><?php echo display_value($row['email'], 'Email not recorded'); ?></div>
         </td>
-        <td><?php echo display_value($row['course'], 'Course not recorded'); ?></td>
+          <td><?php echo display_value($row['course'], 'Course not recorded'); ?></td>
           <td><?php echo display_value($row['year_level']); ?></td>
           <td><?php echo display_value($row['birthdate']); ?></td>
           <td><?php echo display_value($row['contact']); ?></td>

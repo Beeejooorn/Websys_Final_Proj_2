@@ -116,6 +116,11 @@ if (!empty($row['course']) && !in_array($row['course'], $courseOptions, true)) {
                 </div>
 
                 <div class="form-group">
+                  <label for="birthdate">Birthdate</label>
+                  <input id="birthdate" name="birthdate" type="date" value="<?php echo e($row['birthdate']); ?>" />
+                </div>
+
+                <div class="form-group">
                   <label for="email">Email Address</label>
                   <input id="email" name="email" type="email" value="<?php echo e($row['email']); ?>" />
                 </div>
