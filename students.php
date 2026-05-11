@@ -94,6 +94,8 @@ $result = $conn->query($sql);
           <th>Name</th>
           <th>Course</th>
           <th>Year Level</th>
+          <th>Contact</th>
+          <th>Address</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
@@ -112,19 +114,21 @@ $result = $conn->query($sql);
           <div class="student-sub"><?php echo display_value($row['email'], 'Email not recorded'); ?></div>
         </td>
         <td><?php echo display_value($row['course'], 'Course not recorded'); ?></td>
-        <td><?php echo display_value($row['year_level']); ?></td>
-        <td><span class="pill <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span></td>
-        <td>
-          <div class="action-links">
-            <a href="edit.php?id=<?php echo e($row['student_id']); ?>">Edit</a>
-            <a href="delete.php?id=<?php echo e($row['student_id']); ?>" onclick="return confirm('Delete this record?')">Delete</a>
-          </div>
-        </td>
+          <td><?php echo display_value($row['year_level']); ?></td>
+          <td><?php echo display_value($row['contact']); ?></td>
+          <td><?php echo display_value($row['address']); ?></td>
+          <td><span class="pill <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span></td>
+          <td>
+            <div class="action-links">
+              <a href="edit.php?id=<?php echo e($row['student_id']); ?>">Edit</a>
+              <a href="delete.php?id=<?php echo e($row['student_id']); ?>" onclick="return confirm('Delete this record?')">Delete</a>
+            </div>
+          </td>
       </tr>
     <?php } ?>
   <?php } else { ?>
     <tr>
-      <td colspan="6">No student records found.</td>
+      <td colspan="8">No student records found.</td>
     </tr>
   <?php } ?>
 </tbody>

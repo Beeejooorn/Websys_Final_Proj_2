@@ -8,10 +8,13 @@ function e($value) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $student_id = trim($_POST['student_id'] ?? '');
-    $fullname = $_POST['fullname'];
-    $email = $_POST['email'];
-    $course = $_POST['course'] ?? '';
+   $student_id = trim($_POST['student_id'] ?? '');
+   $fullname = $_POST['fullname'];
+   $email = $_POST['email'];
+   $course = $_POST['course'] ?? '';
+   $year_level = $_POST['year_level'] ?? '';
+   $contact = $_POST['contact'] ?? '';
+   $address = $_POST['address'] ?? '';
 
     if ($student_id === '' || !ctype_digit($student_id) || (int)$student_id <= 0) {
         $message = "Please enter a valid numeric Student ID.";
@@ -31,8 +34,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($conn->query($sql_user) === TRUE) {
                 $user_id = $conn->insert_id;
 
-                $sql_student = "INSERT INTO students (student_id, user_id, fullname, email, course) 
-                                VALUES ('$student_id', '$user_id', '$fullname', '$email', '$course')";
+               $sql_student = "INSERT INTO students (student_id, user_id, fullname, email, course, year_level, contact, address) 
+                VALUES ('$student_id', '$user_id', '$fullname', '$email', '$course', '$year_level', '$contact', '$address')";
 
                 if ($conn->query($sql_student) === TRUE) {
                     $message = "Student registered successfully";
@@ -174,10 +177,10 @@ if ($yearLevelColumn !== null) {
         </div>
         <div class="form-group">
           <label for="yearlevel">Year Level</label>
-          <select id="yearlevel">
-            <option>Select year level</option>
+          <select id="yearlevel" name="year_level" required>
+            <option value="">Select year level</option>
             <?php foreach ($yearLevelOptions as $yearLevelOption) { ?>
-              <option><?php echo e($yearLevelOption); ?></option>
+              <option value="<?php echo e($yearLevelOption); ?>"><?php echo e($yearLevelOption); ?></option>
             <?php } ?>
           </select>
         </div>
@@ -194,11 +197,11 @@ if ($yearLevelColumn !== null) {
         </div>
         <div class="form-group">
           <label for="contact">Contact Number</label>
-          <input id="contact" type="text" placeholder="Enter contact number" />
+          <input id="contact" name="contact" type="text" placeholder="Enter contact number" />
         </div>
         <div class="form-group full">
           <label for="address">Address</label>
-          <textarea id="address" placeholder="Enter complete address"></textarea>
+          <textarea id="address" name="address" placeholder="Enter complete address"></textarea>
         </div>
       </div>
     </div>
