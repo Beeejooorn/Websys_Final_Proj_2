@@ -26,7 +26,7 @@ $sql = "
     SELECT s.* $yearLevelSelect,
            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
     FROM students s
-    ORDER BY s.student_id DESC
+    ORDER BY s.user_id DESC
 ";
 $result = $conn->query($sql);
 ?>
@@ -94,6 +94,7 @@ $result = $conn->query($sql);
           <th>Name</th>
           <th>Course</th>
           <th>Year Level</th>
+          <th>Birthdate</th>
           <th>Contact</th>
           <th>Address</th>
           <th>Status</th>
@@ -115,6 +116,7 @@ $result = $conn->query($sql);
         </td>
         <td><?php echo display_value($row['course'], 'Course not recorded'); ?></td>
           <td><?php echo display_value($row['year_level']); ?></td>
+          <td><?php echo display_value($row['birthdate']); ?></td>
           <td><?php echo display_value($row['contact']); ?></td>
           <td><?php echo display_value($row['address']); ?></td>
           <td><span class="pill <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span></td>
@@ -128,7 +130,7 @@ $result = $conn->query($sql);
     <?php } ?>
   <?php } else { ?>
     <tr>
-      <td colspan="8">No student records found.</td>
+      <td colspan="9">No student records found.</td>
     </tr>
   <?php } ?>
 </tbody>

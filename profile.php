@@ -23,7 +23,7 @@ $totalCourses = (int) single_value($conn, "
     ) AS course_source
 ");
 $latestStudent = 'No student records yet';
-$latestResult = $conn->query("SELECT fullname FROM students ORDER BY student_id DESC LIMIT 1");
+$latestResult = $conn->query("SELECT fullname FROM students ORDER BY user_id DESC LIMIT 1");
 if ($latestResult && $latestRow = $latestResult->fetch_assoc()) {
     $latestStudent = trim($latestRow['fullname']) !== '' ? $latestRow['fullname'] : 'Unnamed student record';
 }
