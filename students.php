@@ -23,22 +23,44 @@ foreach (['year_level', 'yearlevel', 'year'] as $possibleColumn) {
 $yearLevelSelect = $yearLevelColumn !== null ? ", s.`$yearLevelColumn` AS year_level" : ", NULL AS year_level";
 
 $search = trim($_GET['search'] ?? '');
-$searchSql = "";
+$selectedCourse = trim($_GET['course'] ?? '');
+$whereParts = [];
+
+$courseOptions = [];
+$courseOptionsSql = "
+    SELECT course_name AS course_name FROM courses WHERE TRIM(course_name) <> ''
+    UNION
+    SELECT course AS course_name FROM students WHERE TRIM(course) <> ''
+    ORDER BY course_name
+";
+$courseOptionsResult = $conn->query($courseOptionsSql);
+if ($courseOptionsResult) {
+    while ($courseRow = $courseOptionsResult->fetch_assoc()) {
+        $courseOptions[] = $courseRow['course_name'];
+    }
+}
 
 if ($search !== '') {
     $safeSearch = $conn->real_escape_string($search);
 
-    $searchSql = "
-        WHERE s.student_id LIKE '%$safeSearch%'
+    $whereParts[] = "
+        (s.student_id LIKE '%$safeSearch%'
         OR s.fullname LIKE '%$safeSearch%'
         OR s.email LIKE '%$safeSearch%'
         OR s.course LIKE '%$safeSearch%'
         OR s.year_level LIKE '%$safeSearch%'
         OR s.birthdate LIKE '%$safeSearch%'
         OR s.contact LIKE '%$safeSearch%'
-        OR s.address LIKE '%$safeSearch%'
+        OR s.address LIKE '%$safeSearch%')
     ";
 }
+
+if ($selectedCourse !== '') {
+    $safeCourse = $conn->real_escape_string($selectedCourse);
+    $whereParts[] = "s.course = '$safeCourse'";
+}
+
+$searchSql = !empty($whereParts) ? "WHERE " . implode(" AND ", $whereParts) : "";
 
 $sql = "
     SELECT s.* $yearLevelSelect,
@@ -72,6 +94,7 @@ $result = $conn->query($sql);
       <nav class="nav-links">
         <a href="index.php" class="">Dashboard</a>
         <a href="registration.php" class="">Student Registration</a>
+        <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="active">Student List</a>
         <a href="profile.php" class="">Profile</a>
       </nav>
@@ -100,17 +123,32 @@ $result = $conn->query($sql);
   </div>
 
   <div class="table-toolbar">
-  <form method="GET" action="students.php" class="search-shell">
-    <input 
-      type="text" 
-      name="search" 
-      value="<?php echo e($search); ?>" 
-      placeholder="Search students by name, ID, course, email, year level, or contact" 
-    />
+  <form method="GET" action="students.php" class="student-filter-form">
+    <div class="search-shell">
+      <input 
+        type="text" 
+        name="search" 
+        value="<?php echo e($search); ?>" 
+        placeholder="Search students by name, ID, course, email, year level, or contact" 
+      />
+    </div>
+
+    <div class="course-filter-shell">
+      <select name="course" aria-label="Filter by course" onchange="this.form.submit()">
+        <option value="">All Courses</option>
+        <?php foreach ($courseOptions as $courseOption) { ?>
+          <option value="<?php echo e($courseOption); ?>" <?php if ($selectedCourse === $courseOption) echo 'selected'; ?>>
+            <?php echo e($courseOption); ?>
+          </option>
+        <?php } ?>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Apply Filter</button>
   </form>
 
-  <?php if ($search !== '') { ?>
-    <a href="students.php" class="btn btn-secondary">Clear Search</a>
+  <?php if ($search !== '' || $selectedCourse !== '') { ?>
+    <a href="students.php" class="btn btn-secondary">Clear Filters</a>
   <?php } ?>
 
   <div class="topbar-badge">Database Records</div>
@@ -161,7 +199,7 @@ $result = $conn->query($sql);
   <?php } else { ?>
     <tr>
      <td colspan="9">
-      <?php echo $search !== '' ? 'No matching students found.' : 'No student records found.'; ?>
+      <?php echo ($search !== '' || $selectedCourse !== '') ? 'No matching students found.' : 'No student records found.'; ?>
     </td>
     </tr>
   <?php } ?>

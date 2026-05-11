@@ -71,29 +71,31 @@ $recentEntries = count($recentStudents);
 
 $mostPopulatedCourse = 'No course data recorded';
 $courseResult = $conn->query("
-    SELECT course, COUNT(*) AS total
+    SELECT TRIM(course) AS course_title, COUNT(*) AS total
     FROM students
     WHERE TRIM(course) <> ''
-    GROUP BY course
-    ORDER BY total DESC, course ASC
+    GROUP BY TRIM(course)
+    ORDER BY total DESC, course_title ASC
     LIMIT 1
 ");
 if ($courseResult && $courseRow = $courseResult->fetch_assoc()) {
-    $mostPopulatedCourse = $courseRow['course'];
+    $courseTotal = (int) $courseRow['total'];
+    $mostPopulatedCourse = $courseRow['course_title'] . ' (' . number_format($courseTotal) . ' student' . ($courseTotal === 1 ? '' : 's') . ')';
 }
 
-$primaryEnrollmentWindow = 'No enrollment semester recorded';
-if (table_exists($conn, 'enrollments')) {
-    $semesterResult = $conn->query("
-        SELECT semester, COUNT(*) AS total
-        FROM enrollments
-        WHERE TRIM(semester) <> ''
-        GROUP BY semester
-        ORDER BY total DESC, semester DESC
+$largestYearLevel = 'No year-level data recorded';
+if ($yearColumn !== null) {
+    $yearLevelResult = $conn->query("
+        SELECT TRIM(`$yearColumn`) AS year_level_title, COUNT(*) AS total
+        FROM students
+        WHERE TRIM(`$yearColumn`) <> ''
+        GROUP BY TRIM(`$yearColumn`)
+        ORDER BY total DESC, year_level_title ASC
         LIMIT 1
     ");
-    if ($semesterResult && $semesterRow = $semesterResult->fetch_assoc()) {
-        $primaryEnrollmentWindow = $semesterRow['semester'];
+    if ($yearLevelResult && $yearLevelRow = $yearLevelResult->fetch_assoc()) {
+        $yearLevelTotal = (int) $yearLevelRow['total'];
+        $largestYearLevel = $yearLevelRow['year_level_title'] . ' (' . number_format($yearLevelTotal) . ' student' . ($yearLevelTotal === 1 ? '' : 's') . ')';
     }
 }
 
@@ -127,6 +129,7 @@ $yearSummaryNote = $yearColumn !== null
       <nav class="nav-links">
         <a href="index.php" class="active">Dashboard</a>
         <a href="registration.php" class="">Student Registration</a>
+        <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="">Student List</a>
         <a href="profile.php" class="">Profile</a>
       </nav>
@@ -213,8 +216,8 @@ $yearSummaryNote = $yearColumn !== null
       </div>
       <div class="info-stack">
         <div class="info-tile">
-          <small>Primary Enrollment Window</small>
-          <strong><?php echo e($primaryEnrollmentWindow); ?></strong>
+          <small>Largest Year Level</small>
+          <strong><?php echo e($largestYearLevel); ?></strong>
         </div>
         <div class="info-tile">
           <small>Most Populated Course</small>

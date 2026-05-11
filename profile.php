@@ -50,6 +50,7 @@ if ($latestResult && $latestRow = $latestResult->fetch_assoc()) {
       <nav class="nav-links">
         <a href="index.php" class="">Dashboard</a>
         <a href="registration.php" class="">Student Registration</a>
+        <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="">Student List</a>
         <a href="profile.php" class="active">Profile</a>
       </nav>

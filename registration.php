@@ -16,9 +16,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $birthdate = $_POST['birthdate'] ?? '';
     $contact = $_POST['contact'] ?? '';
     $address = $_POST['address'] ?? '';
+    $semester = trim($_POST['semester'] ?? '');
+    $grade = trim($_POST['grade'] ?? '');
 
     if ($student_id === '' || !ctype_digit($student_id) || (int)$student_id <= 0 || (int)$student_id > 2147483647) {
         $message = "Please enter a valid numeric Student ID between 1 and 2147483647.";
+    } elseif ($semester === '') {
+        $message = "Please enter the enrollment semester.";
     } else {
         $student_id = (int)$student_id;
 
@@ -27,28 +31,62 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($check_student && $check_student->num_rows > 0) {
             $message = "Student ID already exists. Please enter a different Student ID.";
         } else {
-            $password_column = $conn->query("SHOW COLUMNS FROM users LIKE 'password'");
-            $has_password_column = $password_column && $password_column->num_rows > 0;
+            $safeCourse = $conn->real_escape_string($course);
+            $course_lookup = $conn->query("SELECT course_id FROM courses WHERE course_name = '$safeCourse' LIMIT 1");
 
-            $sql_user = $has_password_column
-                ? "INSERT INTO users (email, password) VALUES ('$email', '')"
-                : "INSERT INTO users (email) VALUES ('$email')";
-
-            if ($conn->query($sql_user) === TRUE) {
-                $user_id = $conn->insert_id;
-
-                $sql_student = "INSERT INTO students 
-                    (student_id, user_id, fullname, email, course, year_level, birthdate, contact, address) 
-                    VALUES 
-                    ('$student_id', '$user_id', '$fullname', '$email', '$course', '$year_level', '$birthdate', '$contact', '$address')";
-
-                if ($conn->query($sql_student) === TRUE) {
-                    $message = "Student registered successfully";
-                } else {
-                    $message = "Error: " . $conn->error;
-                }
+            if (!$course_lookup || $course_lookup->num_rows === 0) {
+                $message = "Selected course was not found in the courses table.";
             } else {
-                $message = "Error: " . $conn->error;
+                $course_row = $course_lookup->fetch_assoc();
+                $course_id = (int)$course_row['course_id'];
+
+                $safeFullname = $conn->real_escape_string($fullname);
+                $safeEmail = $conn->real_escape_string($email);
+                $safeYearLevel = $conn->real_escape_string($year_level);
+                $safeBirthdate = $conn->real_escape_string($birthdate);
+                $safeContact = $conn->real_escape_string($contact);
+                $safeAddress = $conn->real_escape_string($address);
+                $safeSemester = $conn->real_escape_string($semester);
+                $safeGrade = $conn->real_escape_string($grade);
+
+                $conn->begin_transaction();
+
+                try {
+                    $password_column = $conn->query("SHOW COLUMNS FROM users LIKE 'password'");
+                    $has_password_column = $password_column && $password_column->num_rows > 0;
+
+                    $sql_user = $has_password_column
+                        ? "INSERT INTO users (email, password) VALUES ('$safeEmail', '')"
+                        : "INSERT INTO users (email) VALUES ('$safeEmail')";
+
+                    if ($conn->query($sql_user) !== TRUE) {
+                        throw new Exception($conn->error);
+                    }
+
+                    $user_id = $conn->insert_id;
+
+                    $sql_student = "INSERT INTO students 
+                        (student_id, user_id, fullname, email, course, year_level, birthdate, contact, address) 
+                        VALUES 
+                        ('$student_id', '$user_id', '$safeFullname', '$safeEmail', '$safeCourse', '$safeYearLevel', '$safeBirthdate', '$safeContact', '$safeAddress')";
+
+                    if ($conn->query($sql_student) !== TRUE) {
+                        throw new Exception($conn->error);
+                    }
+
+                    $sql_enrollment = "INSERT INTO enrollments (student_id, course_id, semester, grade)
+                        VALUES ('$student_id', '$course_id', '$safeSemester', '$safeGrade')";
+
+                    if ($conn->query($sql_enrollment) !== TRUE) {
+                        throw new Exception($conn->error);
+                    }
+
+                    $conn->commit();
+                    $message = "Student registered and enrolled successfully.";
+                } catch (Exception $error) {
+                    $conn->rollback();
+                    $message = "Error: " . $error->getMessage();
+                }
             }
         }
     }
@@ -149,7 +187,7 @@ if ($yearLevelColumn !== null) {
       <header class="topbar">
         <div class="page-intro">
           <h2>Student Registration</h2>
-          <p>A visually organized registration form layout for adding new student records.</p>
+          <p>A visually organized form for creating student and enrollment records in one flow.</p>
         </div>
         <div class="topbar-badge">Academic Portal</div>
       </header>
@@ -163,7 +201,7 @@ if ($yearLevelColumn !== null) {
         <div class="section-title">
           <div>
             <h3>Student Registration Form</h3>
-            <p>Structured fields grouped clearly for a clean and readable registration layout.</p>
+            <p>Structured fields grouped clearly so student details and initial enrollment are saved together.</p>
           </div>
         </div>
 
@@ -237,8 +275,27 @@ if ($yearLevelColumn !== null) {
             </div>
           </div>
 
+          <div class="form-section">
+            <h4>Enrollment Information</h4>
+            <p>The selected course above will be used automatically for the enrollment record.</p>
+
+            <div class="form-grid">
+
+              <div class="form-group">
+                <label for="semester">Semester</label>
+                <input id="semester" name="semester" type="text" placeholder="Example: 1st Semester" required />
+              </div>
+
+              <div class="form-group">
+                <label for="grade">Grade</label>
+                <input id="grade" name="grade" type="text" placeholder="Example: 1.25 or N/A" />
+              </div>
+
+            </div>
+          </div>
+
           <div class="button-row">
-            <button type="submit" class="btn btn-primary">Register Student</button>
+            <button type="submit" class="btn btn-primary">Register and Enroll Student</button>
             <button type="reset" class="btn btn-secondary">Clear Form</button>
           </div>
 
