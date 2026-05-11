@@ -173,13 +173,14 @@ if ($yearLevelColumn !== null) {
       <nav class="nav-links">
         <a href="index.php" class="">Dashboard</a>
         <a href="registration.php" class="active">Student Registration</a>
+        <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="">Student List</a>
         <a href="profile.php" class="">Profile</a>
       </nav>
 
       <div class="sidebar-card">
         <h3>System Workspace</h3>
-        <p>Manage registration, records, and profile information from one workspace.</p>
+        <p>Manage registration, records, enrollment, and profile information from one workspace.</p>
       </div>
     </aside>
 

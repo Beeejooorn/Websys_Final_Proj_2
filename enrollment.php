@@ -1,51 +1,8 @@
 <?php
 include 'db_connect.php';
 
-$message = "";
-
 function e($value) {
     return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
-}
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $student_id = $_POST['student_id'] ?? '';
-    $course_id = $_POST['course_id'] ?? '';
-    $semester = $_POST['semester'] ?? '';
-    $grade = $_POST['grade'] ?? '';
-
-    if ($student_id === '' || $course_id === '' || $semester === '') {
-        $message = "Please select a student, course, and semester.";
-    } else {
-        $student_id = (int)$student_id;
-        $course_id = (int)$course_id;
-
-        $sql = "INSERT INTO enrollments (student_id, course_id, semester, grade)
-                VALUES ('$student_id', '$course_id', '$semester', '$grade')";
-
-        if ($conn->query($sql) === TRUE) {
-            $message = "Student enrolled successfully.";
-        } else {
-            $message = "Error: " . $conn->error;
-        }
-    }
-}
-
-$students = [];
-$student_result = $conn->query("SELECT student_id, fullname, email FROM students ORDER BY user_id DESC");
-
-if ($student_result) {
-    while ($row = $student_result->fetch_assoc()) {
-        $students[] = $row;
-    }
-}
-
-$courses = [];
-$course_result = $conn->query("SELECT course_id, course_name, course_code FROM courses ORDER BY course_name ASC");
-
-if ($course_result) {
-    while ($row = $course_result->fetch_assoc()) {
-        $courses[] = $row;
-    }
 }
 
 $enrollments = [];
@@ -92,11 +49,11 @@ if ($enrollment_result) {
       </div>
 
       <nav class="nav-links">
-        <a href="index.php">Dashboard</a>
-        <a href="registration.php">Student Registration</a>
-        <a href="students.php">Student List</a>
+        <a href="index.php" class="">Dashboard</a>
+        <a href="registration.php" class="">Student Registration</a>
         <a href="enrollment.php" class="active">Enrollment</a>
-        <a href="profile.php">Profile</a>
+        <a href="students.php" class="">Student List</a>
+        <a href="profile.php" class="">Profile</a>
       </nav>
 
       <div class="sidebar-card">
@@ -109,77 +66,16 @@ if ($enrollment_result) {
       <header class="topbar">
         <div class="page-intro">
           <h2>Enrollment</h2>
-          <p>Enroll registered students into courses and track semester information.</p>
+          <p>Review saved enrollment records created from student registration and updates.</p>
         </div>
-        <div class="topbar-badge">Enrollment Module</div>
+        <div class="topbar-badge">Enrollment Records</div>
       </header>
 
       <section class="card section-card">
-        <?php if ($message != "") { ?>
-          <p><?php echo e($message); ?></p>
-        <?php } ?>
-
-        <div class="section-title">
-          <div>
-            <h3>Enroll Student</h3>
-            <p>Select a student, assign a course, and save enrollment details.</p>
-          </div>
-        </div>
-
-        <form method="POST" action="enrollment.php">
-          <div class="form-section">
-            <h4>Enrollment Information</h4>
-            <p>This will create a new record in the enrollments table.</p>
-
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="student_id">Student</label>
-                <select id="student_id" name="student_id" required>
-                  <option value="">Select student</option>
-                  <?php foreach ($students as $student) { ?>
-                    <option value="<?php echo e($student['student_id']); ?>">
-                      <?php echo e($student['fullname']); ?> - ID: <?php echo e($student['student_id']); ?>
-                    </option>
-                  <?php } ?>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="course_id">Course</label>
-                <select id="course_id" name="course_id" required>
-                  <option value="">Select course</option>
-                  <?php foreach ($courses as $course) { ?>
-                    <option value="<?php echo e($course['course_id']); ?>">
-                      <?php echo e($course['course_name']); ?> (<?php echo e($course['course_code']); ?>)
-                    </option>
-                  <?php } ?>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="semester">Semester</label>
-                <input id="semester" name="semester" type="text" placeholder="Example: 1st Semester" required />
-              </div>
-
-              <div class="form-group">
-                <label for="grade">Grade</label>
-                <input id="grade" name="grade" type="text" placeholder="Example: 1.25 or N/A" />
-              </div>
-            </div>
-          </div>
-
-          <div class="button-row">
-            <button type="submit" class="btn btn-primary">Enroll Student</button>
-            <button type="reset" class="btn btn-secondary">Clear Form</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card section-card" style="margin-top: 24px;">
         <div class="section-title">
           <div>
             <h3>Enrollment Records</h3>
-            <p>Saved enrollment records from the database.</p>
+            <p>Saved enrollment details connected to registered student records.</p>
           </div>
         </div>
 
@@ -192,6 +88,7 @@ if ($enrollment_result) {
                 <th>Course</th>
                 <th>Semester</th>
                 <th>Grade</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -209,11 +106,16 @@ if ($enrollment_result) {
                     </td>
                     <td><?php echo e($enrollment['semester']); ?></td>
                     <td><?php echo e($enrollment['grade']); ?></td>
+                    <td>
+                      <div class="action-links">
+                        <a href="edit.php?id=<?php echo e($enrollment['student_id']); ?>">Edit</a>
+                      </div>
+                    </td>
                   </tr>
                 <?php } ?>
               <?php } else { ?>
                 <tr>
-                  <td colspan="5">No enrollment records found.</td>
+                  <td colspan="6">No enrollment records found.</td>
                 </tr>
               <?php } ?>
             </tbody>

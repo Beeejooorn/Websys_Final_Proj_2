@@ -57,7 +57,7 @@ if ($latestResult && $latestRow = $latestResult->fetch_assoc()) {
 
       <div class="sidebar-card">
         <h3>System Workspace</h3>
-        <p>Manage registration, records, and profile information from one workspace.</p>
+        <p>Manage registration, records, enrollment, and profile information from one workspace.</p>
       </div>
     </aside>
 
