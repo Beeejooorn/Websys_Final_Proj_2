@@ -1,4 +1,5 @@
 <?php
+include 'auth_check.php';
 include 'db_connect.php';
 
 function e($value) {
@@ -67,7 +68,7 @@ $sql = "
            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
     FROM students s
     $searchSql
-    ORDER BY s.user_id DESC
+    ORDER BY s.student_id DESC
 ";
 
 $result = $conn->query($sql);
@@ -97,6 +98,7 @@ $result = $conn->query($sql);
         <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="active">Student List</a>
         <a href="profile.php" class="">Profile</a>
+        <a href="logout.php" class="logout-link">Logout</a>
       </nav>
 
       <div class="sidebar-card">

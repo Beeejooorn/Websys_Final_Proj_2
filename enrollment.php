@@ -1,4 +1,5 @@
 <?php
+include 'auth_check.php';
 include 'db_connect.php';
 
 function e($value) {
@@ -54,6 +55,7 @@ if ($enrollment_result) {
         <a href="enrollment.php" class="active">Enrollment</a>
         <a href="students.php" class="">Student List</a>
         <a href="profile.php" class="">Profile</a>
+        <a href="logout.php" class="logout-link">Logout</a>
       </nav>
 
       <div class="sidebar-card">

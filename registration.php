@@ -1,93 +1,125 @@
 <?php
+include 'auth_check.php';
 include 'db_connect.php';
+include 'validation_helpers.php';
 
 $message = "";
+$messageType = "";
 
 function e($value) {
     return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
+function set_form_message($text, $type = "error") {
+    global $message, $messageType;
+
+    $message = $text;
+    $messageType = $type;
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $student_id = trim($_POST['student_id'] ?? '');
-    $fullname = $_POST['fullname'] ?? '';
-    $email = $_POST['email'] ?? '';
-    $course = $_POST['course'] ?? '';
-    $year_level = $_POST['year_level'] ?? '';
-    $birthdate = $_POST['birthdate'] ?? '';
-    $contact = $_POST['contact'] ?? '';
-    $address = $_POST['address'] ?? '';
+    $fullname = trim($_POST['fullname'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $course = trim($_POST['course'] ?? '');
+    $year_level = trim($_POST['year_level'] ?? '');
+    $birthdate = trim($_POST['birthdate'] ?? '');
+    $contact = trim($_POST['contact'] ?? '');
+    $address = trim($_POST['address'] ?? '');
     $semester = trim($_POST['semester'] ?? '');
     $grade = trim($_POST['grade'] ?? '');
 
-    if ($student_id === '' || !ctype_digit($student_id) || (int)$student_id <= 0 || (int)$student_id > 2147483647) {
-        $message = "Please enter a valid numeric Student ID between 1 and 2147483647.";
-    } elseif ($semester === '') {
-        $message = "Please enter the enrollment semester.";
+    if (!sms_is_valid_person_name($fullname)) {
+        set_form_message("Student was not registered. Full name should contain only letters, spaces, hyphens, apostrophes, or periods.");
+    } elseif (!sms_is_valid_gmail_address($email)) {
+        set_form_message("Student was not registered. Please enter a valid Gmail address ending in @gmail.com, for example student@gmail.com.");
+    } elseif ($course === '') {
+        set_form_message("Student was not registered. Please select a valid course.");
+    } elseif (!sms_is_valid_year_level($year_level)) {
+        set_form_message("Student was not registered. Please select a valid year level.");
+    } elseif (!sms_is_valid_birthdate($birthdate)) {
+        set_form_message("Student was not registered. Please enter a valid birthdate that is not in the future.");
+    } elseif (!sms_is_valid_contact_number($contact)) {
+        set_form_message("Student was not registered. Contact number may contain only numbers, spaces, dashes, or an optional + at the start.");
+    } elseif (!sms_is_valid_semester($semester)) {
+        set_form_message("Please enter the enrollment semester.");
+    } elseif (!sms_is_valid_grade($grade)) {
+        set_form_message("Student was not registered. Grade should be a number, N/A, or INC.");
     } else {
-        $student_id = (int)$student_id;
+        $course_lookup = $conn->prepare("SELECT course_id FROM courses WHERE course_name = ? LIMIT 1");
 
-        $check_student = $conn->query("SELECT student_id FROM students WHERE student_id = $student_id");
-
-        if ($check_student && $check_student->num_rows > 0) {
-            $message = "Student ID already exists. Please enter a different Student ID.";
+        if (!$course_lookup) {
+            set_form_message("Student was not registered. Unable to prepare the course lookup.");
         } else {
-            $safeCourse = $conn->real_escape_string($course);
-            $course_lookup = $conn->query("SELECT course_id FROM courses WHERE course_name = '$safeCourse' LIMIT 1");
+        $course_lookup->bind_param("s", $course);
+        if (!$course_lookup->execute()) {
+            set_form_message("Student was not registered. Unable to check the selected course.");
+            $course_lookup->close();
+        } else {
+        $course_result = $course_lookup->get_result();
 
-            if (!$course_lookup || $course_lookup->num_rows === 0) {
-                $message = "Selected course was not found in the courses table.";
-            } else {
-                $course_row = $course_lookup->fetch_assoc();
-                $course_id = (int)$course_row['course_id'];
+        if (!$course_result || $course_result->num_rows === 0) {
+            set_form_message("Student was not registered. Selected course was not found in the courses table.");
+            $course_lookup->close();
+        } else {
+            $course_row = $course_result->fetch_assoc();
+            $course_id = (int)$course_row['course_id'];
+            $course_lookup->close();
 
-                $safeFullname = $conn->real_escape_string($fullname);
-                $safeEmail = $conn->real_escape_string($email);
-                $safeYearLevel = $conn->real_escape_string($year_level);
-                $safeBirthdate = $conn->real_escape_string($birthdate);
-                $safeContact = $conn->real_escape_string($contact);
-                $safeAddress = $conn->real_escape_string($address);
-                $safeSemester = $conn->real_escape_string($semester);
-                $safeGrade = $conn->real_escape_string($grade);
+            $conn->begin_transaction();
 
-                $conn->begin_transaction();
+            try {
+                $student_stmt = $conn->prepare("
+                    INSERT INTO students
+                        (fullname, email, course, year_level, birthdate, contact, address)
+                    VALUES
+                        (?, ?, ?, ?, ?, ?, ?)
+                ");
 
-                try {
-                    $password_column = $conn->query("SHOW COLUMNS FROM users LIKE 'password'");
-                    $has_password_column = $password_column && $password_column->num_rows > 0;
-
-                    $sql_user = $has_password_column
-                        ? "INSERT INTO users (email, password) VALUES ('$safeEmail', '')"
-                        : "INSERT INTO users (email) VALUES ('$safeEmail')";
-
-                    if ($conn->query($sql_user) !== TRUE) {
-                        throw new Exception($conn->error);
-                    }
-
-                    $user_id = $conn->insert_id;
-
-                    $sql_student = "INSERT INTO students 
-                        (student_id, user_id, fullname, email, course, year_level, birthdate, contact, address) 
-                        VALUES 
-                        ('$student_id', '$user_id', '$safeFullname', '$safeEmail', '$safeCourse', '$safeYearLevel', '$safeBirthdate', '$safeContact', '$safeAddress')";
-
-                    if ($conn->query($sql_student) !== TRUE) {
-                        throw new Exception($conn->error);
-                    }
-
-                    $sql_enrollment = "INSERT INTO enrollments (student_id, course_id, semester, grade)
-                        VALUES ('$student_id', '$course_id', '$safeSemester', '$safeGrade')";
-
-                    if ($conn->query($sql_enrollment) !== TRUE) {
-                        throw new Exception($conn->error);
-                    }
-
-                    $conn->commit();
-                    $message = "Student registered and enrolled successfully.";
-                } catch (Exception $error) {
-                    $conn->rollback();
-                    $message = "Error: " . $error->getMessage();
+                if (!$student_stmt) {
+                    throw new Exception("Unable to prepare the student record insert.");
                 }
+
+                $student_stmt->bind_param("sssssss", $fullname, $email, $course, $year_level, $birthdate, $contact, $address);
+
+                if (!$student_stmt->execute()) {
+                    throw new Exception($student_stmt->error);
+                }
+
+                $student_id = $conn->insert_id;
+                $student_stmt->close();
+
+                if ($student_id <= 0) {
+                    throw new Exception("The student record was not saved correctly.");
+                }
+
+                $enrollment_stmt = $conn->prepare("
+                    INSERT INTO enrollments (student_id, course_id, semester, grade)
+                    VALUES (?, ?, ?, ?)
+                ");
+
+                if (!$enrollment_stmt) {
+                    throw new Exception("Unable to prepare the enrollment record insert.");
+                }
+
+                $enrollment_stmt->bind_param("iiss", $student_id, $course_id, $semester, $grade);
+
+                if (!$enrollment_stmt->execute()) {
+                    throw new Exception($enrollment_stmt->error);
+                }
+
+                $enrollment_stmt->close();
+
+                if (!$conn->commit()) {
+                    throw new Exception("The registration could not be completed.");
+                }
+
+                set_form_message("Student registered and enrolled successfully. Student ID: " . $student_id, "success");
+            } catch (Exception $error) {
+                $conn->rollback();
+                set_form_message("Student was not registered. " . $error->getMessage());
             }
+        }
+        }
         }
     }
 }
@@ -118,12 +150,7 @@ if ($course_result) {
     }
 }
 
-$defaultYearLevelOptions = [
-    '1st Year',
-    '2nd Year',
-    '3rd Year',
-    '4th Year'
-];
+$defaultYearLevelOptions = sms_valid_year_levels();
 
 $yearLevelOptions = $defaultYearLevelOptions;
 
@@ -176,6 +203,7 @@ if ($yearLevelColumn !== null) {
         <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="">Student List</a>
         <a href="profile.php" class="">Profile</a>
+        <a href="logout.php" class="logout-link">Logout</a>
       </nav>
 
       <div class="sidebar-card">
@@ -196,7 +224,7 @@ if ($yearLevelColumn !== null) {
       <section class="card section-card">
 
         <?php if ($message != "") { ?>
-          <p><?php echo e($message); ?></p>
+          <p class="<?php echo $messageType === 'success' ? 'success-message' : 'error-message'; ?>"><?php echo e($message); ?></p>
         <?php } ?>
 
         <div class="section-title">
@@ -216,12 +244,7 @@ if ($yearLevelColumn !== null) {
 
               <div class="form-group">
                 <label for="fullname">Full Name</label>
-                <input id="fullname" name="fullname" type="text" placeholder="Enter full name" required />
-              </div>
-
-              <div class="form-group">
-                <label for="studentid">Student ID</label>
-               <input id="studentid" name="student_id" type="number" min="1" max="2147483647" step="1" placeholder="Enter student ID" required />
+                <input id="fullname" name="fullname" type="text" placeholder="Enter full name" pattern="[A-Za-z .'\-]{2,100}" title="Use letters, spaces, hyphens, apostrophes, or periods only" required />
               </div>
 
               <div class="form-group">
@@ -246,7 +269,7 @@ if ($yearLevelColumn !== null) {
 
               <div class="form-group">
                 <label for="birthdate">Birthdate</label>
-                <input id="birthdate" name="birthdate" type="date" required />
+                <input id="birthdate" name="birthdate" type="date" max="<?php echo date('Y-m-d'); ?>" required />
               </div>
 
             </div>
@@ -260,12 +283,12 @@ if ($yearLevelColumn !== null) {
 
               <div class="form-group">
                 <label for="email">Email Address</label>
-                <input id="email" name="email" type="email" placeholder="Enter email address" required />
+                <input id="email" name="email" type="email" placeholder="Enter email address" pattern="[A-Za-z0-9._%+\-]+@gmail\.com" title="Enter a valid Gmail address, for example student@gmail.com" required />
               </div>
 
               <div class="form-group">
                 <label for="contact">Contact Number</label>
-                <input id="contact" name="contact" type="text" placeholder="Enter contact number" />
+                <input id="contact" name="contact" type="tel" placeholder="Enter contact number" pattern="\+?[0-9][0-9\s-]{6,19}" title="Use numbers only, with optional spaces, dashes, or + at the start" />
               </div>
 
               <div class="form-group full">
@@ -284,16 +307,20 @@ if ($yearLevelColumn !== null) {
 
               <div class="form-group">
                 <label for="semester">Semester</label>
-                <input id="semester" name="semester" type="text" placeholder="Example: 1st Semester" required />
+                <input id="semester" name="semester" type="text" placeholder="Example: 1st Semester" pattern="[A-Za-z0-9 ._\-]{2,50}" title="Use letters, numbers, spaces, periods, underscores, or dashes" required />
               </div>
 
               <div class="form-group">
                 <label for="grade">Grade</label>
-                <input id="grade" name="grade" type="text" placeholder="Example: 1.25 or N/A" />
+                <input id="grade" name="grade" type="text" placeholder="Example: 1.25 or N/A" pattern="(N/A|INC|[0-9]{1,3}(\.[0-9]{1,2})?)" title="Use a number, N/A, or INC" />
               </div>
 
             </div>
           </div>
+
+          <?php if ($message != "") { ?>
+            <p class="<?php echo $messageType === 'success' ? 'success-message' : 'error-message'; ?>"><?php echo e($message); ?></p>
+          <?php } ?>
 
           <div class="button-row">
             <button type="submit" class="btn btn-primary">Register and Enroll Student</button>

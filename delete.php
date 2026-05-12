@@ -1,4 +1,5 @@
 <?php
+include 'auth_check.php';
 include 'db_connect.php';
 
 $id = (int)($_GET['id'] ?? 0);
@@ -8,39 +9,40 @@ if ($id <= 0) {
     exit();
 }
 
-// First, get the user_id connected to this student
-$get_user_sql = "SELECT user_id FROM students WHERE student_id = $id";
-$user_result = $conn->query($get_user_sql);
+$check_stmt = $conn->prepare("SELECT student_id FROM students WHERE student_id = ? LIMIT 1");
+$check_stmt->bind_param("i", $id);
+$check_stmt->execute();
+$student_result = $check_stmt->get_result();
 
-if ($user_result && $user_result->num_rows > 0) {
-    $student = $user_result->fetch_assoc();
-    $user_id = (int)$student['user_id'];
-
-    // Delete enrollment records connected to this student first
-    $delete_enrollments_sql = "DELETE FROM enrollments WHERE student_id = $id";
-
-    if ($conn->query($delete_enrollments_sql) === TRUE) {
-
-        // Delete the student record
-        $delete_student_sql = "DELETE FROM students WHERE student_id = $id";
-
-        if ($conn->query($delete_student_sql) === TRUE) {
-
-            // Delete the connected user record
-            $delete_user_sql = "DELETE FROM users WHERE user_id = $user_id";
-            $conn->query($delete_user_sql);
-
-            header("Location: students.php");
-            exit();
-        } else {
-            echo "Error deleting student: " . $conn->error;
-        }
-
-    } else {
-        echo "Error deleting enrollment records: " . $conn->error;
-    }
-
-} else {
+if (!$student_result || $student_result->num_rows === 0) {
     echo "Student not found.";
+    exit();
+}
+
+$check_stmt->close();
+
+$conn->begin_transaction();
+
+try {
+    $delete_enrollments_stmt = $conn->prepare("DELETE FROM enrollments WHERE student_id = ?");
+    $delete_enrollments_stmt->bind_param("i", $id);
+    if (!$delete_enrollments_stmt->execute()) {
+        throw new Exception($delete_enrollments_stmt->error);
+    }
+    $delete_enrollments_stmt->close();
+
+    $delete_student_stmt = $conn->prepare("DELETE FROM students WHERE student_id = ?");
+    $delete_student_stmt->bind_param("i", $id);
+    if (!$delete_student_stmt->execute()) {
+        throw new Exception($delete_student_stmt->error);
+    }
+    $delete_student_stmt->close();
+
+    $conn->commit();
+    header("Location: students.php");
+    exit();
+} catch (Exception $error) {
+    $conn->rollback();
+    echo "Error deleting student: " . $error->getMessage();
 }
 ?>

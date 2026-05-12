@@ -1,4 +1,5 @@
 <?php
+include 'auth_check.php';
 include 'db_connect.php';
 
 function e($value) {
@@ -58,7 +59,7 @@ $recentSql = "
     SELECT s.student_id, s.fullname, s.email, s.course,
            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
     FROM students s
-    ORDER BY s.user_id DESC
+    ORDER BY s.student_id DESC
     LIMIT 4
 ";
 $recentResult = $conn->query($recentSql);
@@ -132,6 +133,7 @@ $yearSummaryNote = $yearColumn !== null
         <a href="enrollment.php" class="">Enrollment</a>
         <a href="students.php" class="">Student List</a>
         <a href="profile.php" class="">Profile</a>
+        <a href="logout.php" class="logout-link">Logout</a>
       </nav>
 
       <div class="sidebar-card">
