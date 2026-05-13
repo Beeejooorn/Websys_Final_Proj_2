@@ -1,9 +1,10 @@
 <?php
-include 'auth_check.php';
-include 'db_connect.php';
+include_once 'auth_check.php';
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
 
 function e($value) {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return sms_escape($value ?? '');
 }
 
 function display_value($value, $fallback = 'Not recorded') {
@@ -19,46 +20,19 @@ function single_value($conn, $sql, $default = 0) {
     return $default;
 }
 
-function table_exists($conn, $table) {
-    $table = $conn->real_escape_string($table);
-    $result = $conn->query("SHOW TABLES LIKE '$table'");
-    return $result && $result->num_rows > 0;
-}
-
-function first_existing_column($conn, $table, $columns) {
-    $table = $conn->real_escape_string($table);
-    foreach ($columns as $column) {
-        $safeColumn = $conn->real_escape_string($column);
-        $result = $conn->query("SHOW COLUMNS FROM `$table` LIKE '$safeColumn'");
-        if ($result && $result->num_rows > 0) {
-            return $column;
-        }
-    }
-    return null;
-}
-
 $totalStudents = (int) single_value($conn, "SELECT COUNT(*) AS value FROM students");
-
-$totalCourses = (int) single_value($conn, "
-    SELECT COUNT(*) AS value
-    FROM (
-        SELECT course_name AS course_title FROM courses WHERE TRIM(course_name) <> ''
-        UNION
-        SELECT course AS course_title FROM students WHERE TRIM(course) <> ''
-    ) AS course_source
-");
-
-$yearColumn = first_existing_column($conn, 'students', ['year_level', 'yearlevel', 'year']);
-$totalYearLevels = 0;
-if ($yearColumn !== null) {
-    $totalYearLevels = (int) single_value($conn, "SELECT COUNT(DISTINCT `$yearColumn`) AS value FROM students WHERE TRIM(`$yearColumn`) <> ''");
-}
+$totalCourses = (int) single_value($conn, "SELECT COUNT(*) AS value FROM courses");
+$totalYearLevels = (int) single_value($conn, "SELECT COUNT(DISTINCT year_level) AS value FROM students WHERE TRIM(year_level) <> ''");
 
 $recentStudents = [];
 $recentSql = "
-    SELECT s.student_id, s.fullname, s.email, s.course,
-           (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
+    SELECT s.student_id, s.student_number, s.fullname, s.email, s.year_level,
+           c.course_code, c.course_name,
+           COUNT(e.enrollment_id) AS enrollment_count
     FROM students s
+    LEFT JOIN courses c ON s.course_id = c.course_id
+    LEFT JOIN enrollments e ON e.student_id = s.student_id
+    GROUP BY s.student_id, s.student_number, s.fullname, s.email, s.year_level, c.course_code, c.course_name
     ORDER BY s.student_id DESC
     LIMIT 4
 ";
@@ -72,41 +46,35 @@ $recentEntries = count($recentStudents);
 
 $mostPopulatedCourse = 'No course data recorded';
 $courseResult = $conn->query("
-    SELECT TRIM(course) AS course_title, COUNT(*) AS total
-    FROM students
-    WHERE TRIM(course) <> ''
-    GROUP BY TRIM(course)
-    ORDER BY total DESC, course_title ASC
+    SELECT c.course_code, c.course_name, COUNT(s.student_id) AS total
+    FROM courses c
+    INNER JOIN students s ON s.course_id = c.course_id
+    GROUP BY c.course_id, c.course_code, c.course_name
+    ORDER BY total DESC, c.course_name ASC
     LIMIT 1
 ");
 if ($courseResult && $courseRow = $courseResult->fetch_assoc()) {
-    $courseTotal = (int) $courseRow['total'];
-    $mostPopulatedCourse = $courseRow['course_title'] . ' (' . number_format($courseTotal) . ' student' . ($courseTotal === 1 ? '' : 's') . ')';
+    $courseTotal = (int)$courseRow['total'];
+    $mostPopulatedCourse = $courseRow['course_code'] . ' - ' . $courseRow['course_name'] . ' (' . number_format($courseTotal) . ' student' . ($courseTotal === 1 ? '' : 's') . ')';
 }
 
 $largestYearLevel = 'No year-level data recorded';
-if ($yearColumn !== null) {
-    $yearLevelResult = $conn->query("
-        SELECT TRIM(`$yearColumn`) AS year_level_title, COUNT(*) AS total
-        FROM students
-        WHERE TRIM(`$yearColumn`) <> ''
-        GROUP BY TRIM(`$yearColumn`)
-        ORDER BY total DESC, year_level_title ASC
-        LIMIT 1
-    ");
-    if ($yearLevelResult && $yearLevelRow = $yearLevelResult->fetch_assoc()) {
-        $yearLevelTotal = (int) $yearLevelRow['total'];
-        $largestYearLevel = $yearLevelRow['year_level_title'] . ' (' . number_format($yearLevelTotal) . ' student' . ($yearLevelTotal === 1 ? '' : 's') . ')';
-    }
+$yearLevelResult = $conn->query("
+    SELECT TRIM(year_level) AS year_level_title, COUNT(*) AS total
+    FROM students
+    WHERE TRIM(year_level) <> ''
+    GROUP BY TRIM(year_level)
+    ORDER BY total DESC, year_level_title ASC
+    LIMIT 1
+");
+if ($yearLevelResult && $yearLevelRow = $yearLevelResult->fetch_assoc()) {
+    $yearLevelTotal = (int)$yearLevelRow['total'];
+    $largestYearLevel = $yearLevelRow['year_level_title'] . ' (' . number_format($yearLevelTotal) . ' student' . ($yearLevelTotal === 1 ? '' : 's') . ')';
 }
 
 $recordStatus = $totalStudents > 0
     ? number_format($totalStudents) . ' student record' . ($totalStudents === 1 ? '' : 's') . ' stored'
     : 'No student records yet';
-
-$yearSummaryNote = $yearColumn !== null
-    ? 'Distinct saved year-level values in student records.'
-    : 'No year-level field exists in the current database.';
 ?>
 
 <!DOCTYPE html>
@@ -151,88 +119,91 @@ $yearSummaryNote = $yearColumn !== null
         <div class="topbar-badge">Academic Portal</div>
       </header>
 
-<section class="grid-4">
-  <article class="summary-card">
-    <div class="summary-label">Total Students</div>
-    <div class="summary-value"><?php echo number_format($totalStudents); ?></div>
-    <div class="summary-note">Active student records in the system.</div>
-  </article>
-  <article class="summary-card">
-    <div class="summary-label">Courses</div>
-    <div class="summary-value"><?php echo number_format($totalCourses); ?></div>
-    <div class="summary-note">Unique courses currently stored in the database.</div>
-  </article>
-  <article class="summary-card">
-    <div class="summary-label">Year Levels</div>
-    <div class="summary-value"><?php echo number_format($totalYearLevels); ?></div>
-    <div class="summary-note"><?php echo e($yearSummaryNote); ?></div>
-  </article>
-  <article class="summary-card">
-    <div class="summary-label">Recent Entries</div>
-    <div class="summary-value"><?php echo number_format($recentEntries); ?></div>
-    <div class="summary-note">Latest student records loaded from the database.</div>
-  </article>
-</section>
+      <?php echo sms_flash_html(); ?>
 
-<section class="layout-2">
-  <div class="card section-card">
-    <div class="section-title">
-      <div>
-        <h3>Recent Student Entries</h3>
-        <p>A simple overview of newly added student records.</p>
-      </div>
-    </div>
-    <div class="list-box">
-      <?php if (!empty($recentStudents)) { ?>
-        <?php foreach ($recentStudents as $student) { ?>
-          <?php
-            $statusLabel = ((int)$student['enrollment_count'] > 0) ? 'Enrolled' : 'Registered';
-            $statusClass = ((int)$student['enrollment_count'] > 0) ? 'success' : 'warning';
-          ?>
-          <div class="list-item">
+      <section class="grid-4">
+        <article class="summary-card">
+          <div class="summary-label">Total Students</div>
+          <div class="summary-value"><?php echo number_format($totalStudents); ?></div>
+          <div class="summary-note">Active student records in the system.</div>
+        </article>
+        <article class="summary-card">
+          <div class="summary-label">Courses</div>
+          <div class="summary-value"><?php echo number_format($totalCourses); ?></div>
+          <div class="summary-note">Courses stored in the courses table.</div>
+        </article>
+        <article class="summary-card">
+          <div class="summary-label">Year Levels</div>
+          <div class="summary-value"><?php echo number_format($totalYearLevels); ?></div>
+          <div class="summary-note">Distinct saved year-level values in student records.</div>
+        </article>
+        <article class="summary-card">
+          <div class="summary-label">Recent Entries</div>
+          <div class="summary-value"><?php echo number_format($recentEntries); ?></div>
+          <div class="summary-note">Latest student records loaded from the database.</div>
+        </article>
+      </section>
+
+      <section class="layout-2">
+        <div class="card section-card">
+          <div class="section-title">
             <div>
-              <h4>#<?php echo e($student['student_id']); ?> - <?php echo display_value($student['fullname']); ?></h4>
-              <p><?php echo display_value($student['course'], 'Course not recorded'); ?> - <?php echo display_value($student['email'], 'Email not recorded'); ?></p>
+              <h3>Recent Student Entries</h3>
+              <p>A simple overview of newly added student records.</p>
             </div>
-            <span class="pill <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span>
           </div>
-        <?php } ?>
-      <?php } else { ?>
-        <div class="list-item">
-          <div>
-            <h4>No student records yet</h4>
-            <p>New registrations will appear here automatically.</p>
+          <div class="list-box">
+            <?php if (!empty($recentStudents)) { ?>
+              <?php foreach ($recentStudents as $student) { ?>
+                <?php
+                  $statusLabel = ((int)$student['enrollment_count'] > 0) ? 'Enrolled' : 'Registered';
+                  $statusClass = ((int)$student['enrollment_count'] > 0) ? 'success' : 'warning';
+                  $courseLabel = trim(($student['course_code'] ?? '') . ' - ' . ($student['course_name'] ?? ''), ' -');
+                ?>
+                <div class="list-item">
+                  <div>
+                    <h4><?php echo e($student['student_number']); ?> - <?php echo display_value($student['fullname']); ?></h4>
+                    <p><?php echo display_value($courseLabel, 'Course not recorded'); ?> - <?php echo display_value($student['email'], 'Email not recorded'); ?></p>
+                  </div>
+                  <span class="pill <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span>
+                </div>
+              <?php } ?>
+            <?php } else { ?>
+              <div class="list-item">
+                <div>
+                  <h4>No student records yet</h4>
+                  <p>New registrations will appear here automatically.</p>
+                </div>
+              </div>
+            <?php } ?>
           </div>
         </div>
-      <?php } ?>
-    </div>
-  </div>
 
-  <div class="info-stack">
-    <div class="card section-card">
-      <div class="section-title">
-        <div>
-          <h3>System Overview</h3>
-          <p>Core data points relevant to student management.</p>
+        <div class="info-stack">
+          <div class="card section-card">
+            <div class="section-title">
+              <div>
+                <h3>System Overview</h3>
+                <p>Core data points relevant to student management.</p>
+              </div>
+            </div>
+            <div class="info-stack">
+              <div class="info-tile">
+                <small>Largest Year Level</small>
+                <strong><?php echo e($largestYearLevel); ?></strong>
+              </div>
+              <div class="info-tile">
+                <small>Most Populated Course</small>
+                <strong><?php echo e($mostPopulatedCourse); ?></strong>
+              </div>
+              <div class="info-tile">
+                <small>Current Record Status</small>
+                <strong><?php echo e($recordStatus); ?></strong>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="info-stack">
-        <div class="info-tile">
-          <small>Largest Year Level</small>
-          <strong><?php echo e($largestYearLevel); ?></strong>
-        </div>
-        <div class="info-tile">
-          <small>Most Populated Course</small>
-          <strong><?php echo e($mostPopulatedCourse); ?></strong>
-        </div>
-        <div class="info-tile">
-          <small>Current Record Status</small>
-          <strong><?php echo e($recordStatus); ?></strong>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+      </section>
     </main>
   </div>
 </body>

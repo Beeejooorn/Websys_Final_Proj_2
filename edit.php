@@ -1,98 +1,63 @@
 <?php
-include 'auth_check.php';
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-include 'db_connect.php';
-
-$id = (int)($_GET['id'] ?? 0);
-
-if ($id <= 0) {
-    die("Student not found.");
-}
-
-$student_stmt = $conn->prepare("SELECT * FROM students WHERE student_id = ? LIMIT 1");
-
-if (!$student_stmt) {
-    die("Unable to prepare student lookup.");
-}
-
-$student_stmt->bind_param("i", $id);
-$student_stmt->execute();
-$result = $student_stmt->get_result();
-$row = $result->fetch_assoc();
-$student_stmt->close();
-
-if (!$row) {
-    die("Student not found.");
-}
+include_once 'auth_check.php';
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
 
 function e($value) {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return sms_escape($value ?? '');
 }
 
-$errorMessage = "";
+$studentId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-$errorMessages = [
-    'invalid_name' => "Full name should contain only letters, spaces, hyphens, apostrophes, or periods.",
-    'invalid_email' => "Please enter a valid Gmail address, for example student@gmail.com.",
-    'invalid_course' => "Please select a valid course.",
-    'invalid_year_level' => "Please select a valid year level.",
-    'invalid_birthdate' => "Please enter a valid birthdate that is not in the future.",
-    'invalid_contact' => "Contact number may contain only numbers, spaces, dashes, or an optional + at the start.",
-    'invalid_semester' => "Semester is required and may contain only letters, numbers, spaces, periods, underscores, or dashes.",
-    'invalid_grade' => "Grade should be a number, N/A, or INC.",
-    'save_failed' => "The student record was not updated. Please check the form values and try again."
-];
-
-$errorCode = $_GET['error'] ?? '';
-
-if (isset($errorMessages[$errorCode])) {
-    $errorMessage = $errorMessages[$errorCode];
+if (!sms_is_valid_positive_id($studentId)) {
+    sms_set_flash("error", "Invalid student record.");
+    sms_redirect("students.php");
 }
 
-$courseOptions = [];
-$course_sql = "
-    SELECT course_name AS course_name FROM courses WHERE TRIM(course_name) <> ''
-    UNION
-    SELECT course AS course_name FROM students WHERE TRIM(course) <> ''
-    ORDER BY course_name
-";
-$course_result = $conn->query($course_sql);
-if ($course_result) {
-    while ($course_row = $course_result->fetch_assoc()) {
-        $courseOptions[] = $course_row['course_name'];
-    }
-}
+$studentStmt = $conn->prepare("
+    SELECT s.student_id, s.student_number, s.fullname, s.email, s.course_id, s.year_level, s.birthdate, s.contact, s.address,
+           c.course_code, c.course_name
+    FROM students s
+    LEFT JOIN courses c ON s.course_id = c.course_id
+    WHERE s.student_id = ?
+    LIMIT 1
+");
+$studentStmt->bind_param("i", $studentId);
+$studentStmt->execute();
+$studentResult = $studentStmt->get_result();
+$student = $studentResult->fetch_assoc();
+$studentStmt->close();
 
-if (!empty($row['course']) && !in_array($row['course'], $courseOptions, true)) {
-    $courseOptions[] = $row['course'];
+if (!$student) {
+    sms_set_flash("error", "Student record was not found.");
+    sms_redirect("students.php");
 }
 
 $enrollment = [
-    'enrollment_id' => '',
+    'enrollment_id' => 0,
     'semester' => '',
     'grade' => ''
 ];
 
-$enrollment_stmt = $conn->prepare("
-    SELECT enrollment_id, semester, grade
-    FROM enrollments
-    WHERE student_id = ?
-    ORDER BY enrollment_id DESC
-    LIMIT 1
-");
-
-if ($enrollment_stmt) {
-    $enrollment_stmt->bind_param("i", $id);
-    $enrollment_stmt->execute();
-    $enrollment_result = $enrollment_stmt->get_result();
-
-    if ($enrollment_result && $enrollment_result->num_rows > 0) {
-        $enrollment = $enrollment_result->fetch_assoc();
-    }
-
-    $enrollment_stmt->close();
+$enrollmentStmt = $conn->prepare("SELECT enrollment_id, semester, grade FROM enrollments WHERE student_id = ? ORDER BY enrollment_id DESC LIMIT 1");
+$enrollmentStmt->bind_param("i", $studentId);
+$enrollmentStmt->execute();
+$enrollmentResult = $enrollmentStmt->get_result();
+if ($row = $enrollmentResult->fetch_assoc()) {
+    $enrollment = $row;
 }
+$enrollmentStmt->close();
+
+$courseOptions = [];
+$courseStmt = $conn->prepare("SELECT course_id, course_code, course_name FROM courses ORDER BY course_name ASC");
+$courseStmt->execute();
+$courseResult = $courseStmt->get_result();
+while ($row = $courseResult->fetch_assoc()) {
+    $courseOptions[] = $row;
+}
+$courseStmt->close();
+
+$today = date('Y-m-d');
 ?>
 
 <!DOCTYPE html>
@@ -105,7 +70,6 @@ if ($enrollment_stmt) {
 </head>
 <body>
   <div class="portal">
-
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">SMS</div>
@@ -132,100 +96,106 @@ if ($enrollment_stmt) {
       <header class="topbar">
         <div class="page-intro">
           <h2>Edit Student</h2>
-          <p>Update selected student record using the current saved database values.</p>
+          <p>Update student profile and enrollment details in one place.</p>
         </div>
-        <div class="topbar-badge">Update Operation</div>
+        <div class="topbar-badge">Student Record</div>
       </header>
 
-      <section class="card section-card">
-        <?php if ($errorMessage !== "") { ?>
-          <p class="error-message"><?php echo e($errorMessage); ?></p>
-        <?php } ?>
+      <section class="card">
+        <h2>Edit Student Form</h2>
+        <p>The visible student number can be updated, but the internal database ID remains unchanged.</p>
 
-        <div class="section-title">
-          <div>
-            <h3>Edit Student Form</h3>
-            <p>Change the student information below, then submit to save the update.</p>
-          </div>
-        </div>
+        <?php echo sms_flash_html(); ?>
 
         <form method="POST" action="update.php">
-          <input type="hidden" name="student_id" value="<?php echo e($row['student_id']); ?>">
-          <input type="hidden" name="enrollment_id" value="<?php echo e($enrollment['enrollment_id']); ?>">
+          <input type="hidden" name="student_id" value="<?php echo e($student['student_id']); ?>" />
+          <input type="hidden" name="enrollment_id" value="<?php echo e($enrollment['enrollment_id']); ?>" />
 
           <div class="form-section">
-            <h4>Student Information</h4>
-            <p>These values are loaded from the database.</p>
+            <h4>Personal Information</h4>
+            <p>Update the student details saved in the students table.</p>
 
             <div class="form-grid">
               <div class="form-group">
-                <label for="fullname">Full Name</label>
-                <input id="fullname" name="fullname" type="text" value="<?php echo e($row['fullname']); ?>" pattern="[A-Za-z .'\-]{2,100}" title="Use letters, spaces, hyphens, apostrophes, or periods only" required />
+                <label for="student_number">Student Number</label>
+                <input id="student_number" name="student_number" type="text" value="<?php echo e($student['student_number']); ?>" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" required />
               </div>
 
               <div class="form-group">
-                  <label for="course">Course</label>
-                  <select id="course" name="course" required>
-                    <?php foreach ($courseOptions as $courseOption) { ?>
-                      <option value="<?php echo e($courseOption); ?>" <?php if ($row['course'] == $courseOption) echo 'selected'; ?>>
-                        <?php echo e($courseOption); ?>
-                      </option>
-                    <?php } ?>
-                  </select>
-                </div>
+                <label for="fullname">Full Name</label>
+                <input id="fullname" name="fullname" type="text" value="<?php echo e($student['fullname']); ?>" maxlength="100" pattern="[A-Za-z .'\-]{2,100}" required />
+              </div>
 
-                <div class="form-group">
-                  <label for="yearlevel">Year Level</label>
-                  <select id="yearlevel" name="year_level" required>
-                    <option value="">Select year level</option>
-                    <option value="1st Year" <?php if ($row['year_level'] == '1st Year') echo 'selected'; ?>>1st Year</option>
-                    <option value="2nd Year" <?php if ($row['year_level'] == '2nd Year') echo 'selected'; ?>>2nd Year</option>
-                    <option value="3rd Year" <?php if ($row['year_level'] == '3rd Year') echo 'selected'; ?>>3rd Year</option>
-                    <option value="4th Year" <?php if ($row['year_level'] == '4th Year') echo 'selected'; ?>>4th Year</option>
-                  </select>
-                </div>
+              <div class="form-group">
+                <label for="course_id">Course</label>
+                <select id="course_id" name="course_id" required>
+                  <option value="">Select course</option>
+                  <?php foreach ($courseOptions as $course) { ?>
+                    <option value="<?php echo e($course['course_id']); ?>" <?php echo (int)$student['course_id'] === (int)$course['course_id'] ? 'selected' : ''; ?>>
+                      <?php echo e($course['course_code'] . ' - ' . $course['course_name']); ?>
+                    </option>
+                  <?php } ?>
+                </select>
+              </div>
 
-                <div class="form-group">
-                  <label for="birthdate">Birthdate</label>
-                  <input id="birthdate" name="birthdate" type="date" value="<?php echo e($row['birthdate']); ?>" max="<?php echo date('Y-m-d'); ?>" required />
-                </div>
+              <div class="form-group">
+                <label for="year_level">Year Level</label>
+                <select id="year_level" name="year_level" required>
+                  <option value="">Select year level</option>
+                  <?php foreach (sms_valid_year_levels() as $level) { ?>
+                    <option value="<?php echo e($level); ?>" <?php echo $student['year_level'] === $level ? 'selected' : ''; ?>><?php echo e($level); ?></option>
+                  <?php } ?>
+                </select>
+              </div>
 
-                <div class="form-group">
-                  <label for="email">Email Address</label>
-                  <input id="email" name="email" type="email" value="<?php echo e($row['email']); ?>" pattern="[A-Za-z0-9._%+\-]+@gmail\.com" title="Enter a valid Gmail address, for example student@gmail.com" required />
-                </div>
+              <div class="form-group">
+                <label for="birthdate">Birthdate</label>
+                <input id="birthdate" name="birthdate" type="date" value="<?php echo e($student['birthdate']); ?>" max="<?php echo e($today); ?>" required />
+              </div>
+            </div>
+          </div>
 
-                <div class="form-group">
-                  <label for="contact">Contact Number</label>
-                  <input id="contact" name="contact" type="tel" value="<?php echo e($row['contact']); ?>" pattern="\+?[0-9][0-9\s-]{6,19}" title="Use numbers only, with optional spaces, dashes, or + at the start" />
-                </div>
+          <div class="form-section">
+            <h4>Contact Information</h4>
+            <p>Update email, contact number, and address.</p>
 
-                <div class="form-group full">
-                  <label for="address">Address</label>
-                  <textarea id="address" name="address"><?php echo e($row['address']); ?></textarea>
-                </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input id="email" name="email" type="email" value="<?php echo e($student['email']); ?>" pattern="[A-Za-z0-9._%+\-]+@gmail\.com" required />
+              </div>
+
+              <div class="form-group">
+                <label for="contact">Contact Number</label>
+                <input id="contact" name="contact" type="text" value="<?php echo e($student['contact']); ?>" inputmode="tel" maxlength="20" pattern="\+?[0-9][0-9\s-]{6,19}" required />
+              </div>
+
+              <div class="form-group full-span">
+                <label for="address">Address</label>
+                <textarea id="address" name="address" maxlength="500" required><?php echo e($student['address']); ?></textarea>
+              </div>
             </div>
           </div>
 
           <div class="form-section">
             <h4>Enrollment Information</h4>
-            <p>These values are loaded from the student's saved enrollment record.</p>
+            <p>Update the latest enrollment record connected to this student.</p>
 
             <div class="form-grid">
               <div class="form-group">
                 <label for="semester">Semester</label>
-                <input id="semester" name="semester" type="text" value="<?php echo e($enrollment['semester']); ?>" placeholder="Example: 1st Semester" pattern="[A-Za-z0-9 ._\-]{2,50}" title="Use letters, numbers, spaces, periods, underscores, or dashes" />
+                <input id="semester" name="semester" type="text" value="<?php echo e($enrollment['semester']); ?>" maxlength="50" pattern="[A-Za-z0-9 ._\-]+" required />
               </div>
 
               <div class="form-group">
                 <label for="grade">Grade</label>
-                <input id="grade" name="grade" type="text" value="<?php echo e($enrollment['grade']); ?>" placeholder="Example: 1.25 or N/A" pattern="(N/A|INC|[0-9]{1,3}(\.[0-9]{1,2})?)" title="Use a number, N/A, or INC" />
+                <input id="grade" name="grade" type="text" value="<?php echo e($enrollment['grade']); ?>" maxlength="10" pattern="(N/A|INC|[0-9]{1,3}(\.[0-9]{1,2})?)" />
               </div>
             </div>
           </div>
 
           <div class="button-row">
-            <button type="submit" class="btn btn-primary">Update Student</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
             <a href="students.php" class="btn btn-secondary">Cancel</a>
           </div>
         </form>

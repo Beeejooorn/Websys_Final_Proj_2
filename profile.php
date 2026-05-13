@@ -1,14 +1,14 @@
 <?php
-include 'auth_check.php';
-include 'db_connect.php';
-include 'validation_helpers.php';
+include_once 'auth_check.php';
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
 
 function e($value) {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return sms_escape($value ?? '');
 }
 
-function load_admin($conn, $adminId) {
-    $stmt = $conn->prepare("SELECT admin_id, username, email, password_hash, created_at, updated_at FROM admins WHERE admin_id = ? LIMIT 1");
+function load_admin_for_profile($conn, $adminId) {
+    $stmt = $conn->prepare("SELECT admin_id, username, email, password_hash, role, status, created_at, updated_at, last_login FROM admins WHERE admin_id = ? LIMIT 1");
     $stmt->bind_param("i", $adminId);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -30,23 +30,38 @@ function display_value($value, $fallback = 'Not recorded') {
     return $value !== '' ? e($value) : $fallback;
 }
 
+function admin_initials($name) {
+    $parts = preg_split('/\s+/', trim((string)$name));
+    $initials = '';
+
+    foreach ($parts as $part) {
+        if ($part !== '') {
+            $initials .= strtoupper(substr($part, 0, 1));
+        }
+
+        if (strlen($initials) >= 2) {
+            break;
+        }
+    }
+
+    return $initials !== '' ? $initials : 'A';
+}
+
 $adminId = (int)$_SESSION['admin_id'];
-$admin = load_admin($conn, $adminId);
+$admin = load_admin_for_profile($conn, $adminId);
 
 if (!$admin) {
     $_SESSION = [];
     session_destroy();
-    header("Location: login.php");
-    exit();
+    sms_redirect("login.php");
 }
 
-$usernameMessage = "";
-$emailMessage = "";
-$passwordMessage = "";
-$totalStudents = (int) single_value($conn, "SELECT COUNT(*) AS value FROM students");
-$totalCourses = (int) single_value($conn, "SELECT COUNT(*) AS value FROM courses");
-$totalEnrollments = (int) single_value($conn, "SELECT COUNT(*) AS value FROM enrollments");
-$totalAdmins = (int) single_value($conn, "SELECT COUNT(*) AS value FROM admins");
+$messages = [
+    'username' => ['type' => '', 'text' => ''],
+    'email' => ['type' => '', 'text' => ''],
+    'password' => ['type' => '', 'text' => ''],
+    'manage' => ['type' => '', 'text' => '']
+];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $action = $_POST['profile_action'] ?? '';
@@ -54,10 +69,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($action === 'update_username') {
         $newUsername = trim($_POST['username'] ?? '');
 
-        if ($newUsername === '') {
-            $usernameMessage = "Username cannot be empty.";
-        } elseif (!sms_is_valid_admin_username($newUsername)) {
-            $usernameMessage = "Username must be 3-50 characters and may use letters, numbers, spaces, periods, underscores, or dashes.";
+        if (!sms_is_valid_admin_username($newUsername)) {
+            $messages['username'] = ['type' => 'error', 'text' => 'Username must be 3-50 characters and may use letters, numbers, spaces, periods, underscores, or dashes.'];
         } else {
             $checkStmt = $conn->prepare("SELECT admin_id FROM admins WHERE username = ? AND admin_id <> ? LIMIT 1");
             $checkStmt->bind_param("si", $newUsername, $adminId);
@@ -67,16 +80,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $checkStmt->close();
 
             if ($usernameTaken) {
-                $usernameMessage = "That username is already used by another admin.";
+                $messages['username'] = ['type' => 'error', 'text' => 'That username is already used by another admin.'];
             } else {
                 $updateStmt = $conn->prepare("UPDATE admins SET username = ? WHERE admin_id = ?");
                 $updateStmt->bind_param("si", $newUsername, $adminId);
 
                 if ($updateStmt->execute()) {
                     $_SESSION['username'] = $newUsername;
-                    $usernameMessage = "Username updated successfully.";
+                    sms_log_activity($conn, "admin_updated", "Updated own admin username.", $adminId);
+                    $messages['username'] = ['type' => 'success', 'text' => 'Admin updated successfully.'];
                 } else {
-                    $usernameMessage = "Unable to update username.";
+                    $messages['username'] = ['type' => 'error', 'text' => 'Unable to update username.'];
                 }
 
                 $updateStmt->close();
@@ -87,10 +101,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($action === 'update_email') {
         $newEmail = strtolower(trim($_POST['email'] ?? ''));
 
-        if ($newEmail === '') {
-            $emailMessage = "Email cannot be empty.";
-        } elseif (!sms_is_valid_gmail_address($newEmail)) {
-            $emailMessage = "Please enter a valid Gmail address ending in @gmail.com.";
+        if (!sms_is_valid_gmail_address($newEmail)) {
+            $messages['email'] = ['type' => 'error', 'text' => 'Please enter a valid Gmail address ending in @gmail.com.'];
         } else {
             $checkStmt = $conn->prepare("SELECT admin_id FROM admins WHERE email = ? AND admin_id <> ? LIMIT 1");
             $checkStmt->bind_param("si", $newEmail, $adminId);
@@ -100,16 +112,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $checkStmt->close();
 
             if ($emailTaken) {
-                $emailMessage = "That Gmail address is already used by another admin.";
+                $messages['email'] = ['type' => 'error', 'text' => 'That Gmail address is already used by another admin.'];
             } else {
                 $updateStmt = $conn->prepare("UPDATE admins SET email = ? WHERE admin_id = ?");
                 $updateStmt->bind_param("si", $newEmail, $adminId);
 
                 if ($updateStmt->execute()) {
-                    $_SESSION['email'] = $newEmail;
-                    $emailMessage = "Email updated successfully.";
+                    $_SESSION['admin_email'] = $newEmail;
+                    sms_log_activity($conn, "admin_updated", "Updated own admin email.", $adminId);
+                    $messages['email'] = ['type' => 'success', 'text' => 'Admin updated successfully.'];
                 } else {
-                    $emailMessage = "Unable to update email.";
+                    $messages['email'] = ['type' => 'error', 'text' => 'Unable to update email.'];
                 }
 
                 $updateStmt->close();
@@ -123,29 +136,74 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $confirmPassword = $_POST['confirm_password'] ?? '';
 
         if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
-            $passwordMessage = "Please complete all password fields.";
+            $messages['password'] = ['type' => 'error', 'text' => 'Please complete all password fields.'];
         } elseif (!sms_is_valid_password($newPassword)) {
-            $passwordMessage = "New password must be at least 8 characters long.";
+            $messages['password'] = ['type' => 'error', 'text' => 'New password must be at least 8 characters long.'];
         } elseif ($newPassword !== $confirmPassword) {
-            $passwordMessage = "New password and confirm password do not match.";
+            $messages['password'] = ['type' => 'error', 'text' => 'New password and confirm password do not match.'];
         } elseif (!password_verify($currentPassword, $admin['password_hash'])) {
-            $passwordMessage = "Current password is incorrect.";
+            $messages['password'] = ['type' => 'error', 'text' => 'Current password is incorrect.'];
         } else {
             $newPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
             $passwordStmt = $conn->prepare("UPDATE admins SET password_hash = ? WHERE admin_id = ?");
             $passwordStmt->bind_param("si", $newPasswordHash, $adminId);
 
             if ($passwordStmt->execute()) {
-                $passwordMessage = "Password updated successfully.";
+                sms_log_activity($conn, "admin_updated", "Updated own admin password.", $adminId);
+                $messages['password'] = ['type' => 'success', 'text' => 'Admin updated successfully.'];
             } else {
-                $passwordMessage = "Unable to update password.";
+                $messages['password'] = ['type' => 'error', 'text' => 'Unable to update password.'];
             }
 
             $passwordStmt->close();
         }
     }
 
-    $admin = load_admin($conn, $adminId);
+    if ($action === 'manage_admin') {
+        $targetAdminId = (int)($_POST['target_admin_id'] ?? 0);
+        $role = $_POST['role'] ?? '';
+        $status = $_POST['status'] ?? '';
+
+        if ($admin['role'] !== 'super_admin') {
+            $messages['manage'] = ['type' => 'error', 'text' => 'Only a super admin can manage admin accounts.'];
+        } elseif (!sms_is_valid_positive_id($targetAdminId) || !sms_is_valid_admin_role($role) || !sms_is_valid_admin_status($status)) {
+            $messages['manage'] = ['type' => 'error', 'text' => 'Please choose a valid admin, role, and status.'];
+        } elseif ($targetAdminId === $adminId) {
+            $messages['manage'] = ['type' => 'warning', 'text' => 'Use the account forms above for your own profile. Role and status changes for your own account are blocked here.'];
+        } else {
+            $updateStmt = $conn->prepare("UPDATE admins SET role = ?, status = ? WHERE admin_id = ?");
+            $updateStmt->bind_param("ssi", $role, $status, $targetAdminId);
+
+            if ($updateStmt->execute()) {
+                $actionName = $status === 'disabled' ? 'admin_disabled' : 'admin_updated';
+                $messageText = $status === 'disabled' ? 'Admin disabled successfully.' : 'Admin updated successfully.';
+                sms_log_activity($conn, $actionName, "Updated admin ID " . $targetAdminId . " to role " . $role . " and status " . $status . ".", $adminId);
+                $messages['manage'] = ['type' => 'success', 'text' => $messageText];
+            } else {
+                $messages['manage'] = ['type' => 'error', 'text' => 'Unable to update admin. The system may be protecting the last active super admin.'];
+            }
+
+            $updateStmt->close();
+        }
+    }
+
+    $admin = load_admin_for_profile($conn, $adminId);
+}
+
+$totalStudents = (int) single_value($conn, "SELECT COUNT(*) AS value FROM students");
+$totalCourses = (int) single_value($conn, "SELECT COUNT(*) AS value FROM courses");
+$totalEnrollments = (int) single_value($conn, "SELECT COUNT(*) AS value FROM enrollments");
+$totalAdmins = (int) single_value($conn, "SELECT COUNT(*) AS value FROM admins");
+$activeAdmins = (int) single_value($conn, "SELECT COUNT(*) AS value FROM admins WHERE status = 'active'");
+
+$admins = [];
+if ($admin['role'] === 'super_admin') {
+    $adminResult = $conn->query("SELECT admin_id, username, email, role, status, created_at, updated_at, last_login FROM admins ORDER BY admin_id ASC");
+    if ($adminResult) {
+        while ($row = $adminResult->fetch_assoc()) {
+            $admins[] = $row;
+        }
+    }
 }
 ?>
 
@@ -157,7 +215,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
   <title>Admin Profile | Student Management System</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="profile-page">
   <div class="portal">
 
     <aside class="sidebar">
@@ -193,9 +251,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
       <section class="profile-layout">
         <aside class="card profile-card">
-          <div class="avatar">AD</div>
+          <div class="avatar"><?php echo e(admin_initials($admin['username'])); ?></div>
           <h3><?php echo e($admin['username']); ?></h3>
-          <p>Logged-in Administrator</p>
+          <p>Signed-in Administrator</p>
+          <div class="profile-status-row">
+            <span class="account-chip"><?php echo e(ucfirst($admin['status'])); ?></span>
+            <span class="account-chip account-chip-muted"><?php echo e(str_replace('_', ' ', ucwords($admin['role'], '_'))); ?></span>
+          </div>
 
           <div class="profile-meta">
             <div class="meta-row">
@@ -205,6 +267,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="meta-row">
               <small>Admin ID</small>
               <strong><?php echo e($admin['admin_id']); ?></strong>
+            </div>
+            <div class="meta-row">
+              <small>Status</small>
+              <strong><?php echo e(ucfirst($admin['status'])); ?></strong>
+            </div>
+            <div class="meta-row">
+              <small>Last Login</small>
+              <strong><?php echo display_value($admin['last_login']); ?></strong>
             </div>
             <div class="meta-row">
               <small>Created At</small>
@@ -218,7 +288,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         </aside>
 
         <section class="details-grid">
-          <div class="card section-card">
+          <div class="card section-card profile-system-card">
             <div class="section-title">
               <div>
                 <h3>System Information</h3>
@@ -240,13 +310,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <strong><?php echo number_format($totalEnrollments); ?></strong>
               </div>
               <div class="info-box">
+                <small>Active Admins</small>
+                <strong><?php echo number_format($activeAdmins); ?></strong>
+              </div>
+              <div class="info-box">
                 <small>System Status</small>
                 <strong>Database Connected</strong>
               </div>
             </div>
           </div>
 
-          <div class="card section-card">
+          <div class="card section-card profile-account-card">
             <div class="section-title">
               <div>
                 <h3>Admin Account Information</h3>
@@ -268,12 +342,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <strong><?php echo e($admin['admin_id']); ?></strong>
               </div>
               <div class="info-box">
-                <small>Created At</small>
-                <strong><?php echo e($admin['created_at']); ?></strong>
+                <small>Role</small>
+                <strong><?php echo e(str_replace('_', ' ', ucwords($admin['role'], '_'))); ?></strong>
               </div>
               <div class="info-box">
-                <small>Updated At</small>
-                <strong><?php echo e($admin['updated_at']); ?></strong>
+                <small>Status</small>
+                <strong><?php echo e(ucfirst($admin['status'])); ?></strong>
               </div>
               <div class="info-box">
                 <small>Admin Accounts</small>
@@ -286,7 +360,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </div>
           </div>
 
-          <div class="card section-card">
+          <div class="card section-card profile-action-card">
             <div class="section-title">
               <div>
                 <h3>Update Username</h3>
@@ -294,8 +368,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
               </div>
             </div>
 
-            <?php if ($usernameMessage !== "") { ?>
-              <p><?php echo e($usernameMessage); ?></p>
+            <?php if ($messages['username']['text'] !== "") { ?>
+              <p class="<?php echo e($messages['username']['type']); ?>-message"><?php echo e($messages['username']['text']); ?></p>
             <?php } ?>
 
             <form method="POST" action="profile.php">
@@ -308,7 +382,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <div class="form-grid">
                   <div class="form-group">
                     <label for="username">Username</label>
-                    <input id="username" name="username" type="text" value="<?php echo e($admin['username']); ?>" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9 ._\-]{2,49}" title="Use 3-50 characters: letters, numbers, spaces, periods, underscores, or dashes" required />
+                    <input id="username" name="username" type="text" value="<?php echo e($admin['username']); ?>" minlength="3" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9 ._\-]{2,49}" required />
                   </div>
                 </div>
               </div>
@@ -319,7 +393,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </form>
           </div>
 
-          <div class="card section-card">
+          <div class="card section-card profile-action-card">
             <div class="section-title">
               <div>
                 <h3>Update Email</h3>
@@ -327,8 +401,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
               </div>
             </div>
 
-            <?php if ($emailMessage !== "") { ?>
-              <p><?php echo e($emailMessage); ?></p>
+            <?php if ($messages['email']['text'] !== "") { ?>
+              <p class="<?php echo e($messages['email']['type']); ?>-message"><?php echo e($messages['email']['text']); ?></p>
             <?php } ?>
 
             <form method="POST" action="profile.php">
@@ -341,7 +415,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <div class="form-grid">
                   <div class="form-group">
                     <label for="email">Gmail Address</label>
-                    <input id="email" name="email" type="email" value="<?php echo e($admin['email']); ?>" placeholder="example@gmail.com" pattern="[A-Za-z0-9._%+\-]+@gmail\.com" title="Enter a valid Gmail address, for example admin@gmail.com" required />
+                    <input id="email" name="email" type="email" value="<?php echo e($admin['email']); ?>" placeholder="example@gmail.com" pattern="[A-Za-z0-9._%+\-]+@gmail\.com" required />
                   </div>
                 </div>
               </div>
@@ -352,7 +426,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </form>
           </div>
 
-          <div class="card section-card">
+          <div class="card section-card profile-action-card profile-password-card">
             <div class="section-title">
               <div>
                 <h3>Change Password</h3>
@@ -360,8 +434,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
               </div>
             </div>
 
-            <?php if ($passwordMessage !== "") { ?>
-              <p><?php echo e($passwordMessage); ?></p>
+            <?php if ($messages['password']['text'] !== "") { ?>
+              <p class="<?php echo e($messages['password']['type']); ?>-message"><?php echo e($messages['password']['text']); ?></p>
             <?php } ?>
 
             <form method="POST" action="profile.php">
@@ -394,6 +468,70 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
               </div>
             </form>
           </div>
+
+          <?php if ($admin['role'] === 'super_admin') { ?>
+            <div class="card section-card profile-admin-management-card">
+              <div class="section-title">
+                <div>
+                  <h3>Admin Management</h3>
+                  <p>Create, review, enable, or disable administrator accounts.</p>
+                </div>
+                <a href="create_account.php" class="btn btn-primary">Create Admin</a>
+              </div>
+
+              <?php if ($messages['manage']['text'] !== "") { ?>
+                <p class="<?php echo e($messages['manage']['type']); ?>-message"><?php echo e($messages['manage']['text']); ?></p>
+              <?php } ?>
+
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Admin</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Last Login</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($admins as $adminRow) { ?>
+                      <tr>
+                        <td>
+                          <strong><?php echo e($adminRow['username']); ?></strong>
+                          <small>ID: <?php echo e($adminRow['admin_id']); ?></small>
+                        </td>
+                        <td><?php echo e($adminRow['email']); ?></td>
+                        <td><?php echo e(str_replace('_', ' ', ucwords($adminRow['role'], '_'))); ?></td>
+                        <td><?php echo e(ucfirst($adminRow['status'])); ?></td>
+                        <td><?php echo display_value($adminRow['last_login']); ?></td>
+                        <td>
+                          <?php if ((int)$adminRow['admin_id'] === $adminId) { ?>
+                            <span class="topbar-badge">Current Account</span>
+                          <?php } else { ?>
+                            <form class="inline-action-form" method="POST" action="profile.php">
+                              <input type="hidden" name="profile_action" value="manage_admin" />
+                              <input type="hidden" name="target_admin_id" value="<?php echo e($adminRow['admin_id']); ?>" />
+                              <select name="role" aria-label="Role">
+                                <option value="admin" <?php echo $adminRow['role'] === 'admin' ? 'selected' : ''; ?>>Admin</option>
+                                <option value="super_admin" <?php echo $adminRow['role'] === 'super_admin' ? 'selected' : ''; ?>>Super Admin</option>
+                              </select>
+                              <select name="status" aria-label="Status">
+                                <option value="active" <?php echo $adminRow['status'] === 'active' ? 'selected' : ''; ?>>Active</option>
+                                <option value="disabled" <?php echo $adminRow['status'] === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
+                              </select>
+                              <button type="submit" class="btn btn-secondary" onclick="return confirm('Save changes for this admin account?');">Save</button>
+                            </form>
+                          <?php } ?>
+                        </td>
+                      </tr>
+                    <?php } ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <?php } ?>
         </section>
       </section>
     </main>

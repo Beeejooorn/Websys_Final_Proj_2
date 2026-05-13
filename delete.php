@@ -1,48 +1,60 @@
 <?php
-include 'auth_check.php';
-include 'db_connect.php';
+include_once 'auth_check.php';
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
 
-$id = (int)($_GET['id'] ?? 0);
-
-if ($id <= 0) {
-    echo "Invalid student ID.";
-    exit();
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    sms_set_flash("error", "Delete actions must be submitted from the Student List page.");
+    sms_redirect("students.php");
 }
 
-$check_stmt = $conn->prepare("SELECT student_id FROM students WHERE student_id = ? LIMIT 1");
-$check_stmt->bind_param("i", $id);
-$check_stmt->execute();
-$student_result = $check_stmt->get_result();
+$studentId = (int)($_POST['student_id'] ?? 0);
 
-if (!$student_result || $student_result->num_rows === 0) {
-    echo "Student not found.";
-    exit();
+if (!sms_is_valid_positive_id($studentId)) {
+    sms_set_flash("error", "Invalid student record.");
+    sms_redirect("students.php");
 }
 
-$check_stmt->close();
+$studentStmt = $conn->prepare("SELECT student_number, fullname FROM students WHERE student_id = ? LIMIT 1");
+$studentStmt->bind_param("i", $studentId);
+$studentStmt->execute();
+$studentResult = $studentStmt->get_result();
+$student = $studentResult->fetch_assoc();
+$studentStmt->close();
+
+if (!$student) {
+    sms_set_flash("error", "Student record was not found.");
+    sms_redirect("students.php");
+}
 
 $conn->begin_transaction();
 
 try {
-    $delete_enrollments_stmt = $conn->prepare("DELETE FROM enrollments WHERE student_id = ?");
-    $delete_enrollments_stmt->bind_param("i", $id);
-    if (!$delete_enrollments_stmt->execute()) {
-        throw new Exception($delete_enrollments_stmt->error);
-    }
-    $delete_enrollments_stmt->close();
+    $enrollmentStmt = $conn->prepare("DELETE FROM enrollments WHERE student_id = ?");
+    $enrollmentStmt->bind_param("i", $studentId);
 
-    $delete_student_stmt = $conn->prepare("DELETE FROM students WHERE student_id = ?");
-    $delete_student_stmt->bind_param("i", $id);
-    if (!$delete_student_stmt->execute()) {
-        throw new Exception($delete_student_stmt->error);
+    if (!$enrollmentStmt->execute()) {
+        throw new Exception($enrollmentStmt->error);
     }
-    $delete_student_stmt->close();
 
+    $enrollmentStmt->close();
+
+    $studentDeleteStmt = $conn->prepare("DELETE FROM students WHERE student_id = ?");
+    $studentDeleteStmt->bind_param("i", $studentId);
+
+    if (!$studentDeleteStmt->execute()) {
+        throw new Exception($studentDeleteStmt->error);
+    }
+
+    $studentDeleteStmt->close();
     $conn->commit();
-    header("Location: students.php");
-    exit();
-} catch (Exception $error) {
+
+    sms_log_activity($conn, "student_deleted", "Deleted student " . $student['student_number'] . " - " . $student['fullname'] . ".", sms_current_admin_id());
+    sms_set_flash("success", "Student deleted successfully.");
+} catch (Exception $exception) {
     $conn->rollback();
-    echo "Error deleting student: " . $error->getMessage();
+    sms_set_flash("error", "Unable to delete student. No records were changed.");
 }
+
+sms_redirect("students.php");
 ?>

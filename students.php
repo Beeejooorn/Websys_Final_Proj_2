@@ -1,77 +1,66 @@
 <?php
-include 'auth_check.php';
-include 'db_connect.php';
+include_once 'auth_check.php';
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
 
 function e($value) {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return sms_escape($value ?? '');
 }
 
 function display_value($value, $fallback = 'Not recorded') {
     $value = trim((string)($value ?? ''));
-    return $value !== '' && $value !== '0000-00-00' ? e($value) : $fallback;
+    return $value !== '' ? e($value) : $fallback;
 }
-
-$yearLevelColumn = null;
-foreach (['year_level', 'yearlevel', 'year'] as $possibleColumn) {
-    $safeColumn = $conn->real_escape_string($possibleColumn);
-    $column_result = $conn->query("SHOW COLUMNS FROM students LIKE '$safeColumn'");
-    if ($column_result && $column_result->num_rows > 0) {
-        $yearLevelColumn = $possibleColumn;
-        break;
-    }
-}
-
-$yearLevelSelect = $yearLevelColumn !== null ? ", s.`$yearLevelColumn` AS year_level" : ", NULL AS year_level";
 
 $search = trim($_GET['search'] ?? '');
-$selectedCourse = trim($_GET['course'] ?? '');
-$whereParts = [];
+$courseFilter = trim($_GET['course_id'] ?? '');
 
 $courseOptions = [];
-$courseOptionsSql = "
-    SELECT course_name AS course_name FROM courses WHERE TRIM(course_name) <> ''
-    UNION
-    SELECT course AS course_name FROM students WHERE TRIM(course) <> ''
-    ORDER BY course_name
-";
-$courseOptionsResult = $conn->query($courseOptionsSql);
-if ($courseOptionsResult) {
-    while ($courseRow = $courseOptionsResult->fetch_assoc()) {
-        $courseOptions[] = $courseRow['course_name'];
-    }
+$courseStmt = $conn->prepare("SELECT course_id, course_code, course_name FROM courses ORDER BY course_name ASC");
+$courseStmt->execute();
+$courseResult = $courseStmt->get_result();
+while ($row = $courseResult->fetch_assoc()) {
+    $courseOptions[] = $row;
 }
+$courseStmt->close();
+
+$where = [];
+$types = "";
+$params = [];
 
 if ($search !== '') {
-    $safeSearch = $conn->real_escape_string($search);
-
-    $whereParts[] = "
-        (s.student_id LIKE '%$safeSearch%'
-        OR s.fullname LIKE '%$safeSearch%'
-        OR s.email LIKE '%$safeSearch%'
-        OR s.course LIKE '%$safeSearch%'
-        OR s.year_level LIKE '%$safeSearch%'
-        OR s.birthdate LIKE '%$safeSearch%'
-        OR s.contact LIKE '%$safeSearch%'
-        OR s.address LIKE '%$safeSearch%')
-    ";
+    $searchTerm = '%' . $search . '%';
+    $where[] = "(s.student_number LIKE ? OR s.fullname LIKE ? OR s.email LIKE ? OR c.course_name LIKE ? OR c.course_code LIKE ? OR s.year_level LIKE ? OR s.contact LIKE ?)";
+    $types .= "sssssss";
+    array_push($params, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm);
 }
 
-if ($selectedCourse !== '') {
-    $safeCourse = $conn->real_escape_string($selectedCourse);
-    $whereParts[] = "s.course = '$safeCourse'";
+if ($courseFilter !== '' && sms_is_valid_positive_id($courseFilter)) {
+    $courseId = (int)$courseFilter;
+    $where[] = "s.course_id = ?";
+    $types .= "i";
+    $params[] = $courseId;
 }
 
-$searchSql = !empty($whereParts) ? "WHERE " . implode(" AND ", $whereParts) : "";
-
+$whereSql = $where ? "WHERE " . implode(" AND ", $where) : "";
 $sql = "
-    SELECT s.* $yearLevelSelect,
-           (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = s.student_id) AS enrollment_count
+    SELECT s.student_id, s.student_number, s.fullname, s.email, s.year_level, s.birthdate, s.contact, s.address,
+           c.course_code, c.course_name,
+           COUNT(e.enrollment_id) AS enrollment_count
     FROM students s
-    $searchSql
+    LEFT JOIN courses c ON s.course_id = c.course_id
+    LEFT JOIN enrollments e ON e.student_id = s.student_id
+    $whereSql
+    GROUP BY s.student_id, s.student_number, s.fullname, s.email, s.year_level, s.birthdate, s.contact, s.address, c.course_code, c.course_name
     ORDER BY s.student_id DESC
 ";
 
-$result = $conn->query($sql);
+$stmt = $conn->prepare($sql);
+if ($types !== "") {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$students = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -84,7 +73,6 @@ $result = $conn->query($sql);
 </head>
 <body>
   <div class="portal">
-
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">SMS</div>
@@ -116,100 +104,86 @@ $result = $conn->query($sql);
         <div class="topbar-badge">Academic Portal</div>
       </header>
 
-<section class="card section-card">
-  <div class="section-title">
-    <div>
-      <h3>Student Records</h3>
-      <p>Simple and professional table layout showing key student information.</p>
-    </div>
-  </div>
+      <section class="card">
+        <h2>Student Records</h2>
+        <p>Student number is shown as the visible school ID. Internal database IDs are used only for actions.</p>
 
-  <div class="table-toolbar">
-  <form method="GET" action="students.php" class="student-filter-form">
-    <div class="search-shell">
-      <input 
-        type="text" 
-        name="search" 
-        value="<?php echo e($search); ?>" 
-        placeholder="Search students by name, ID, course, email, year level, or contact" 
-      />
-    </div>
+        <?php echo sms_flash_html(); ?>
 
-    <div class="course-filter-shell">
-      <select name="course" aria-label="Filter by course" onchange="this.form.submit()">
-        <option value="">All Courses</option>
-        <?php foreach ($courseOptions as $courseOption) { ?>
-          <option value="<?php echo e($courseOption); ?>" <?php if ($selectedCourse === $courseOption) echo 'selected'; ?>>
-            <?php echo e($courseOption); ?>
-          </option>
-        <?php } ?>
-      </select>
-    </div>
+        <form class="filter-bar" method="GET" action="students.php">
+          <input type="text" name="search" value="<?php echo e($search); ?>" placeholder="Search students by number, name, course, email, year level, or contact" />
+          <select name="course_id">
+            <option value="">All Courses</option>
+            <?php foreach ($courseOptions as $course) { ?>
+              <option value="<?php echo e($course['course_id']); ?>" <?php echo (string)$courseFilter === (string)$course['course_id'] ? 'selected' : ''; ?>>
+                <?php echo e($course['course_code'] . ' - ' . $course['course_name']); ?>
+              </option>
+            <?php } ?>
+          </select>
+          <button type="submit" class="btn btn-primary">Apply Filter</button>
+        </form>
 
-    <button type="submit" class="btn btn-primary">Apply Filter</button>
-  </form>
-
-  <?php if ($search !== '' || $selectedCourse !== '') { ?>
-    <a href="students.php" class="btn btn-secondary">Clear Filters</a>
-  <?php } ?>
-
-  <div class="topbar-badge">Database Records</div>
-</div>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Student ID</th>
-          <th>Name</th>
-          <th>Course</th>
-          <th>Year Level</th>
-          <th>Birthdate</th>
-          <th>Contact</th>
-          <th>Address</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-  <?php if ($result->num_rows > 0) { ?>
-    <?php while($row = $result->fetch_assoc()) { ?>
-      <?php
-        $statusLabel = ((int)$row['enrollment_count'] > 0) ? 'Enrolled' : 'Registered';
-        $statusClass = ((int)$row['enrollment_count'] > 0) ? 'success' : 'warning';
-      ?>
-      <tr>
-        <td><?php echo e($row['student_id']); ?></td>
-        <td>
-          <div class="student-name"><?php echo display_value($row['fullname']); ?></div>
-          <div class="student-sub"><?php echo display_value($row['email'], 'Email not recorded'); ?></div>
-        </td>
-          <td><?php echo display_value($row['course'], 'Course not recorded'); ?></td>
-          <td><?php echo display_value($row['year_level']); ?></td>
-          <td><?php echo display_value($row['birthdate']); ?></td>
-          <td><?php echo display_value($row['contact']); ?></td>
-          <td><?php echo display_value($row['address']); ?></td>
-          <td><span class="pill <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span></td>
-          <td>
-            <div class="action-links">
-              <a href="edit.php?id=<?php echo e($row['student_id']); ?>">Edit</a>
-              <a href="delete.php?id=<?php echo e($row['student_id']); ?>" onclick="return confirm('Delete this record?')">Delete</a>
-            </div>
-          </td>
-      </tr>
-    <?php } ?>
-  <?php } else { ?>
-    <tr>
-     <td colspan="9">
-      <?php echo ($search !== '' || $selectedCourse !== '') ? 'No matching students found.' : 'No student records found.'; ?>
-    </td>
-    </tr>
-  <?php } ?>
-</tbody>
-    </table>
-  </div>
-</section>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student Number</th>
+                <th>Name</th>
+                <th>Course</th>
+                <th>Year Level</th>
+                <th>Birthdate</th>
+                <th>Contact</th>
+                <th>Address</th>
+                <th>Enrollment</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if ($students && $students->num_rows > 0) { ?>
+                <?php while ($row = $students->fetch_assoc()) { ?>
+                  <tr>
+                    <td><strong><?php echo e($row['student_number']); ?></strong></td>
+                    <td>
+                      <strong><?php echo e($row['fullname']); ?></strong>
+                      <small><?php echo e($row['email']); ?></small>
+                    </td>
+                    <td>
+                      <strong><?php echo display_value($row['course_name']); ?></strong>
+                      <small><?php echo display_value($row['course_code']); ?></small>
+                    </td>
+                    <td><?php echo display_value($row['year_level']); ?></td>
+                    <td><?php echo display_value($row['birthdate']); ?></td>
+                    <td><?php echo display_value($row['contact']); ?></td>
+                    <td><?php echo display_value($row['address']); ?></td>
+                    <td>
+                      <?php if ((int)$row['enrollment_count'] > 0) { ?>
+                        <span class="status-badge enrolled">Enrolled</span>
+                      <?php } else { ?>
+                        <span class="status-badge">Registered</span>
+                      <?php } ?>
+                    </td>
+                    <td>
+                      <div class="table-actions">
+                        <a class="btn btn-secondary" href="edit.php?id=<?php echo e($row['student_id']); ?>">Edit</a>
+                        <form method="POST" action="delete.php" onsubmit="return confirm('Delete this student record? This will also remove connected enrollment records.');">
+                          <input type="hidden" name="student_id" value="<?php echo e($row['student_id']); ?>" />
+                          <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <?php } ?>
+              <?php } else { ?>
+                <tr>
+                  <td colspan="9">No student records found.</td>
+                </tr>
+              <?php } ?>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   </div>
 </body>
 </html>
+<?php $stmt->close(); ?>

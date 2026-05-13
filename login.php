@@ -1,16 +1,14 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
 
-include 'db_connect.php';
-include 'validation_helpers.php';
+sms_start_session();
 
 function e($value) {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return sms_escape($value ?? '');
 }
 
-function admin_count($conn) {
+function sms_admin_count($conn) {
     $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM admins");
     $stmt->execute();
     $result = $stmt->get_result();
@@ -20,44 +18,89 @@ function admin_count($conn) {
 }
 
 if (!empty($_SESSION['admin_id'])) {
-    header("Location: index.php");
-    exit();
+    sms_redirect("index.php");
 }
 
 $message = "";
-$adminExists = admin_count($conn) > 0;
+$messageType = "error";
+$adminExists = sms_admin_count($conn) > 0;
+
+$queryMessage = $_GET['message'] ?? '';
+if ($queryMessage === 'logout_success') {
+    $message = "Logout successful.";
+    $messageType = "success";
+} elseif ($queryMessage === 'account_disabled') {
+    $message = "This admin account is disabled.";
+} elseif ($queryMessage === 'account_locked') {
+    $message = "This admin account is temporarily locked. Please try again later.";
+}
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $login = trim($_POST['login'] ?? '');
     $password = $_POST['password'] ?? '';
+    $messageType = "error";
 
     if (!$adminExists) {
         $message = "No admin account exists yet. Please create the first admin account before logging in.";
     } elseif ($login === '' || $password === '') {
         $message = "Please enter your username or Gmail address and password.";
     } elseif (strpos($login, '@') !== false && !sms_is_valid_gmail_address($login)) {
-        $message = "Please enter a valid Gmail address or username.";
+        $message = "Please enter a valid Gmail address ending in @gmail.com.";
     } elseif (strpos($login, '@') === false && !sms_is_valid_admin_username($login)) {
         $message = "Please enter a valid username or Gmail address.";
     } else {
-        $stmt = $conn->prepare("SELECT admin_id, username, email, password_hash FROM admins WHERE username = ? OR email = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT admin_id, username, email, password_hash, role, status, failed_login_count, locked_until FROM admins WHERE username = ? OR email = ? LIMIT 1");
         $stmt->bind_param("ss", $login, $login);
         $stmt->execute();
         $result = $stmt->get_result();
         $admin = $result->fetch_assoc();
         $stmt->close();
 
-        if ($admin && password_verify($password, $admin['password_hash'])) {
+        if (!$admin) {
+            sms_log_login_attempt($conn, null, $login, false);
+            $message = "Login failed. Please check your username/email and password.";
+        } elseif ($admin['status'] !== 'active') {
+            sms_log_login_attempt($conn, (int)$admin['admin_id'], $login, false);
+            $message = "This admin account is disabled.";
+        } elseif (sms_is_locked($admin['locked_until'] ?? null)) {
+            sms_log_login_attempt($conn, (int)$admin['admin_id'], $login, false);
+            $message = "This admin account is temporarily locked. Please try again later.";
+        } elseif (!password_verify($password, $admin['password_hash'])) {
+            $newFailedCount = ((int)$admin['failed_login_count']) + 1;
+            sms_log_login_attempt($conn, (int)$admin['admin_id'], $login, false);
+
+            if ($newFailedCount >= 5) {
+                $lockStmt = $conn->prepare("UPDATE admins SET failed_login_count = ?, locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE admin_id = ?");
+                $lockStmt->bind_param("ii", $newFailedCount, $admin['admin_id']);
+                $lockStmt->execute();
+                $lockStmt->close();
+                $message = "Login failed too many times. This account is temporarily locked for 15 minutes.";
+            } else {
+                $failStmt = $conn->prepare("UPDATE admins SET failed_login_count = ? WHERE admin_id = ?");
+                $failStmt->bind_param("ii", $newFailedCount, $admin['admin_id']);
+                $failStmt->execute();
+                $failStmt->close();
+                $message = "Login failed. Please check your username/email and password.";
+            }
+        } else {
+            $successStmt = $conn->prepare("UPDATE admins SET last_login = NOW(), failed_login_count = 0, locked_until = NULL WHERE admin_id = ?");
+            $successStmt->bind_param("i", $admin['admin_id']);
+            $successStmt->execute();
+            $successStmt->close();
+
+            sms_log_login_attempt($conn, (int)$admin['admin_id'], $login, true);
+
             session_regenerate_id(true);
             $_SESSION['admin_id'] = (int)$admin['admin_id'];
             $_SESSION['username'] = $admin['username'];
-            $_SESSION['email'] = $admin['email'];
+            $_SESSION['admin_email'] = $admin['email'];
+            $_SESSION['admin_role'] = $admin['role'];
+            $_SESSION['admin_status'] = $admin['status'];
 
-            header("Location: index.php");
-            exit();
+            sms_log_activity($conn, "login_success", "Admin logged in.", (int)$admin['admin_id']);
+            sms_set_flash("success", "Login successful.");
+            sms_redirect("index.php");
         }
-
-        $message = "Invalid username or password.";
     }
 }
 ?>
@@ -89,10 +132,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <?php if ($adminExists) { ?>
               Sign in before entering the student management dashboard.
             <?php } else { ?>
-              No admin account exists yet. Create the first admin account to open the dashboard.
+              No admin account exists yet. Create the first super admin account to open the dashboard.
             <?php } ?>
           </p>
         </div>
+
+        <?php if ($message !== "") { ?>
+          <p class="<?php echo e($messageType); ?>-message"><?php echo e($message); ?></p>
+        <?php } ?>
 
         <?php if (!$adminExists) { ?>
           <div class="form-section auth-form-section">
@@ -103,13 +150,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
               <a href="create_account.php" class="btn btn-primary">Create Admin Account</a>
             </div>
           </div>
-        <?php } ?>
-
-        <?php if ($message !== "") { ?>
-          <p class="error-message"><?php echo e($message); ?></p>
-        <?php } ?>
-
-        <?php if ($adminExists) { ?>
+        <?php } else { ?>
           <form method="POST" action="login.php">
             <div class="form-section auth-form-section">
               <h4>Login Credentials</h4>
@@ -123,7 +164,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 <div class="form-group">
                   <label for="password">Password</label>
-                  <input id="password" name="password" type="password" placeholder="Enter password" required />
+                  <input id="password" name="password" type="password" placeholder="Enter password" minlength="8" required />
                 </div>
               </div>
             </div>

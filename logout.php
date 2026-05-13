@@ -1,6 +1,11 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+include_once 'db_connect.php';
+include_once 'validation_helpers.php';
+
+sms_start_session();
+
+if (!empty($_SESSION['admin_id'])) {
+    sms_log_activity($conn, "logout_success", "Admin logged out.", (int)$_SESSION['admin_id']);
 }
 
 $_SESSION = [];
@@ -12,6 +17,5 @@ if (ini_get("session.use_cookies")) {
 
 session_destroy();
 
-header("Location: login.php");
-exit();
+sms_redirect("login.php?message=logout_success");
 ?>
