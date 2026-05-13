@@ -215,7 +215,7 @@ function sms_duplicate_message_from_error($errorMessage, $fallback = 'A duplicat
     $message = strtolower((string)$errorMessage);
 
     if (strpos($message, 'student_number') !== false) {
-        return 'That student number already exists. Please enter a unique 10-digit student number.';
+        return 'Student ID already exists. Please enter a different Student ID.';
     }
 
     if (strpos($message, 'email') !== false) {

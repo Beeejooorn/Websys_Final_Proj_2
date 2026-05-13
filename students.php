@@ -30,29 +30,28 @@ $params = [];
 
 if ($search !== '') {
     $searchTerm = '%' . $search . '%';
-    $where[] = "(s.student_number LIKE ? OR s.fullname LIKE ? OR s.email LIKE ? OR c.course_name LIKE ? OR c.course_code LIKE ? OR s.year_level LIKE ? OR s.contact LIKE ?)";
+    $where[] = "(sd.student_number LIKE ? OR sd.fullname LIKE ? OR sd.email LIKE ? OR sd.course_name LIKE ? OR sd.course_code LIKE ? OR sd.year_level LIKE ? OR sd.contact LIKE ?)";
     $types .= "sssssss";
     array_push($params, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm);
 }
 
 if ($courseFilter !== '' && sms_is_valid_positive_id($courseFilter)) {
     $courseId = (int)$courseFilter;
-    $where[] = "s.course_id = ?";
+    $where[] = "sd.internal_course_id = ?";
     $types .= "i";
     $params[] = $courseId;
 }
 
 $whereSql = $where ? "WHERE " . implode(" AND ", $where) : "";
 $sql = "
-    SELECT s.student_id, s.student_number, s.fullname, s.email, s.year_level, s.birthdate, s.contact, s.address,
-           c.course_code, c.course_name,
+    SELECT sd.internal_student_id, sd.student_number, sd.fullname, sd.email, sd.year_level, sd.contact,
+           sd.course_code, sd.course_name,
            COUNT(e.enrollment_id) AS enrollment_count
-    FROM students s
-    LEFT JOIN courses c ON s.course_id = c.course_id
-    LEFT JOIN enrollments e ON e.student_id = s.student_id
+    FROM v_student_display sd
+    LEFT JOIN enrollments e ON e.student_id = sd.internal_student_id
     $whereSql
-    GROUP BY s.student_id, s.student_number, s.fullname, s.email, s.year_level, s.birthdate, s.contact, s.address, c.course_code, c.course_name
-    ORDER BY s.student_id DESC
+    GROUP BY sd.internal_student_id, sd.student_number, sd.fullname, sd.email, sd.year_level, sd.contact, sd.course_code, sd.course_name
+    ORDER BY sd.internal_student_id DESC
 ";
 
 $stmt = $conn->prepare($sql);
@@ -106,12 +105,12 @@ $students = $stmt->get_result();
 
       <section class="card">
         <h2>Student Records</h2>
-        <p>Student number is shown as the visible school ID. Internal database IDs are used only for actions.</p>
+        <p>Student ID shows the clean 10-digit school ID. Internal database IDs are used only behind the scenes.</p>
 
         <?php echo sms_flash_html(); ?>
 
         <form class="filter-bar" method="GET" action="students.php">
-          <input type="text" name="search" value="<?php echo e($search); ?>" placeholder="Search students by number, name, course, email, year level, or contact" />
+          <input type="text" name="search" value="<?php echo e($search); ?>" placeholder="Search students by Student ID, name, course, email, year level, or contact" />
           <select name="course_id">
             <option value="">All Courses</option>
             <?php foreach ($courseOptions as $course) { ?>
@@ -124,16 +123,14 @@ $students = $stmt->get_result();
         </form>
 
         <div class="table-wrap">
-          <table>
+          <table class="student-table">
             <thead>
               <tr>
-                <th>Student Number</th>
+                <th>Student ID</th>
                 <th>Name</th>
                 <th>Course</th>
                 <th>Year Level</th>
-                <th>Birthdate</th>
                 <th>Contact</th>
-                <th>Address</th>
                 <th>Enrollment</th>
                 <th>Actions</th>
               </tr>
@@ -152,9 +149,7 @@ $students = $stmt->get_result();
                       <small><?php echo display_value($row['course_code']); ?></small>
                     </td>
                     <td><?php echo display_value($row['year_level']); ?></td>
-                    <td><?php echo display_value($row['birthdate']); ?></td>
                     <td><?php echo display_value($row['contact']); ?></td>
-                    <td><?php echo display_value($row['address']); ?></td>
                     <td>
                       <?php if ((int)$row['enrollment_count'] > 0) { ?>
                         <span class="status-badge enrolled">Enrolled</span>
@@ -164,9 +159,9 @@ $students = $stmt->get_result();
                     </td>
                     <td>
                       <div class="table-actions">
-                        <a class="btn btn-secondary" href="edit.php?id=<?php echo e($row['student_id']); ?>">Edit</a>
+                        <a class="btn btn-update" href="edit.php?id=<?php echo e($row['internal_student_id']); ?>">Edit</a>
                         <form method="POST" action="delete.php" onsubmit="return confirm('Delete this student record? This will also remove connected enrollment records.');">
-                          <input type="hidden" name="student_id" value="<?php echo e($row['student_id']); ?>" />
+                          <input type="hidden" name="student_id" value="<?php echo e($row['internal_student_id']); ?>" />
                           <button type="submit" class="btn btn-danger">Delete</button>
                         </form>
                       </div>
@@ -175,7 +170,7 @@ $students = $stmt->get_result();
                 <?php } ?>
               <?php } else { ?>
                 <tr>
-                  <td colspan="9">No student records found.</td>
+                  <td colspan="7">No student records found.</td>
                 </tr>
               <?php } ?>
             </tbody>

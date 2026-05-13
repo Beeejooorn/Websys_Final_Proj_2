@@ -503,8 +503,12 @@ if ($admin['role'] === 'super_admin') {
                           <small>ID: <?php echo e($adminRow['admin_id']); ?></small>
                         </td>
                         <td><?php echo e($adminRow['email']); ?></td>
-                        <td><?php echo e(str_replace('_', ' ', ucwords($adminRow['role'], '_'))); ?></td>
-                        <td><?php echo e(ucfirst($adminRow['status'])); ?></td>
+                        <td>
+                          <span class="role-badge <?php echo e($adminRow['role']); ?>"><?php echo e(str_replace('_', ' ', ucwords($adminRow['role'], '_'))); ?></span>
+                        </td>
+                        <td>
+                          <span class="status-pill <?php echo e($adminRow['status']); ?>"><?php echo e(ucfirst($adminRow['status'])); ?></span>
+                        </td>
                         <td><?php echo display_value($adminRow['last_login']); ?></td>
                         <td>
                           <?php if ((int)$adminRow['admin_id'] === $adminId) { ?>
@@ -521,7 +525,7 @@ if ($admin['role'] === 'super_admin') {
                                 <option value="active" <?php echo $adminRow['status'] === 'active' ? 'selected' : ''; ?>>Active</option>
                                 <option value="disabled" <?php echo $adminRow['status'] === 'disabled' ? 'selected' : ''; ?>>Disabled</option>
                               </select>
-                              <button type="submit" class="btn btn-secondary" onclick="return confirm('Save changes for this admin account?');">Save</button>
+                              <button type="submit" class="btn btn-update" onclick="return confirm('Save changes for this admin account?');">Save</button>
                             </form>
                           <?php } ?>
                         </td>

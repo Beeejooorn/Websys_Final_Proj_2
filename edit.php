@@ -103,7 +103,7 @@ $today = date('Y-m-d');
 
       <section class="card">
         <h2>Edit Student Form</h2>
-        <p>The visible student number can be updated, but the internal database ID remains unchanged.</p>
+        <p>The visible Student ID can be updated, but the internal database ID remains unchanged.</p>
 
         <?php echo sms_flash_html(); ?>
 
@@ -117,8 +117,8 @@ $today = date('Y-m-d');
 
             <div class="form-grid">
               <div class="form-group">
-                <label for="student_number">Student Number</label>
-                <input id="student_number" name="student_number" type="text" value="<?php echo e($student['student_number']); ?>" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" required />
+                <label for="student_number">Student ID / School ID</label>
+                <input id="student_number" name="student_number" type="text" value="<?php echo e($student['student_number']); ?>" placeholder="2026123819" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" required />
               </div>
 
               <div class="form-group">

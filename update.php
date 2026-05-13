@@ -32,7 +32,7 @@ if (!sms_is_valid_positive_id($studentId)) {
 }
 
 if (!sms_is_valid_student_number($studentNumber)) {
-    redirect_update_error($studentId, "Invalid student number format. Please enter exactly 10 digits.");
+    redirect_update_error($studentId, "Student ID must be exactly 10 digits.");
 }
 
 if (!sms_is_valid_person_name($fullname)) {
@@ -90,7 +90,7 @@ $duplicate = $duplicateResult->fetch_assoc();
 $duplicateStmt->close();
 
 if ($duplicate && $duplicate['student_number'] === $studentNumber) {
-    redirect_update_error($studentId, "That student number already exists. Please enter a unique 10-digit student number.");
+    redirect_update_error($studentId, "Student ID already exists. Please enter a different Student ID.");
 }
 
 if ($duplicate && strtolower($duplicate['email']) === $email) {

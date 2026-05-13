@@ -26,14 +26,13 @@ $totalYearLevels = (int) single_value($conn, "SELECT COUNT(DISTINCT year_level) 
 
 $recentStudents = [];
 $recentSql = "
-    SELECT s.student_id, s.student_number, s.fullname, s.email, s.year_level,
-           c.course_code, c.course_name,
+    SELECT sd.internal_student_id, sd.student_number, sd.fullname, sd.email, sd.year_level,
+           sd.course_code, sd.course_name,
            COUNT(e.enrollment_id) AS enrollment_count
-    FROM students s
-    LEFT JOIN courses c ON s.course_id = c.course_id
-    LEFT JOIN enrollments e ON e.student_id = s.student_id
-    GROUP BY s.student_id, s.student_number, s.fullname, s.email, s.year_level, c.course_code, c.course_name
-    ORDER BY s.student_id DESC
+    FROM v_student_display sd
+    LEFT JOIN enrollments e ON e.student_id = sd.internal_student_id
+    GROUP BY sd.internal_student_id, sd.student_number, sd.fullname, sd.email, sd.year_level, sd.course_code, sd.course_name
+    ORDER BY sd.internal_student_id DESC
     LIMIT 4
 ";
 $recentResult = $conn->query($recentSql);

@@ -91,7 +91,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $canCreateAdmin) {
             $isFirstSetup = false;
             sms_log_activity($conn, "admin_created", "Created admin account: " . $username, $currentAdmin ? (int)$currentAdmin['admin_id'] : $newAdminId);
         } else {
-            $message = sms_duplicate_message_from_error($conn->error, "Unable to create admin account. Please check the username and Gmail address.");
+            $message = sms_duplicate_message_from_error($stmt ? $stmt->error : $conn->error, "Unable to create admin account. Please check the username and Gmail address.");
             $messageType = "error";
         }
 

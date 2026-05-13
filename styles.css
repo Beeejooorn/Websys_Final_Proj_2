@@ -719,6 +719,17 @@ form > .button-row{
   border-color:var(--primary);
 }
 
+.btn-update{
+  background:#eef6fb;
+  color:#20506f;
+  border-color:#c7d8e8;
+}
+
+.btn-update:hover{
+  background:#dff0fb;
+  border-color:#9ec4df;
+}
+
 .btn-danger{
   background:var(--danger-soft);
   color:var(--danger);
@@ -1018,6 +1029,61 @@ tbody td small{
   white-space:nowrap;
 }
 
+.student-table{
+  min-width:1120px;
+}
+
+.student-table thead th:nth-child(1),
+.student-table tbody td:nth-child(1){
+  width:150px;
+}
+
+.student-table thead th:nth-child(2),
+.student-table tbody td:nth-child(2){
+  width:270px;
+}
+
+.student-table thead th:nth-child(3),
+.student-table tbody td:nth-child(3){
+  width:280px;
+}
+
+.student-table thead th:nth-child(4),
+.student-table tbody td:nth-child(4){
+  width:130px;
+}
+
+.student-table thead th:nth-child(5),
+.student-table tbody td:nth-child(5){
+  width:150px;
+}
+
+.student-table thead th:nth-child(6),
+.student-table tbody td:nth-child(6){
+  width:130px;
+}
+
+.student-table thead th:nth-child(7),
+.student-table tbody td:nth-child(7){
+  width:170px;
+}
+
+.student-table tbody td:nth-child(2),
+.student-table tbody td:nth-child(3){
+  overflow:hidden;
+}
+
+.student-table thead th:nth-child(1),
+.student-table tbody td:nth-child(1),
+.student-table thead th:nth-child(4),
+.student-table tbody td:nth-child(4),
+.student-table thead th:nth-child(5),
+.student-table tbody td:nth-child(5),
+.student-table thead th:nth-child(6),
+.student-table tbody td:nth-child(6){
+  white-space:nowrap;
+}
+
 .inline-action-form{
   display:flex;
   align-items:center;
@@ -1078,7 +1144,7 @@ tbody td small{
 }
 
 .enrollment-table{
-  min-width:1120px;
+  min-width:1180px;
   table-layout:fixed;
 }
 
@@ -1089,7 +1155,7 @@ tbody td small{
 
 .enrollment-table thead th:nth-child(1),
 .enrollment-table tbody td:nth-child(1){
-  width:120px;
+  width:110px;
 }
 
 .enrollment-table thead th:nth-child(2),
@@ -1099,7 +1165,7 @@ tbody td small{
 
 .enrollment-table thead th:nth-child(3),
 .enrollment-table tbody td:nth-child(3){
-  width:240px;
+  width:255px;
 }
 
 .enrollment-table thead th:nth-child(4),
@@ -1114,7 +1180,19 @@ tbody td small{
 
 .enrollment-table thead th:nth-child(6),
 .enrollment-table tbody td:nth-child(6){
-  width:290px;
+  width:160px;
+}
+
+.enrollment-table thead th:nth-child(7),
+.enrollment-table tbody td:nth-child(7){
+  width:160px;
+}
+
+.enrollment-table thead th:nth-child(6),
+.enrollment-table tbody td:nth-child(6),
+.enrollment-table thead th:nth-child(7),
+.enrollment-table tbody td:nth-child(7){
+  white-space:nowrap;
 }
 
 .enrollment-table .inline-action-form{
@@ -1157,6 +1235,47 @@ tbody td small{
 .status-badge.enrolled{
   background:#d7f4ee;
   color:var(--success);
+}
+
+.role-badge,
+.status-pill{
+  min-height:28px;
+  padding:6px 10px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--surface-soft);
+  color:var(--muted);
+  font-size:0.72rem;
+  font-weight:700;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+
+.role-badge.super_admin{
+  border-color:#bedfd6;
+  background:#e8f7f3;
+  color:var(--primary);
+}
+
+.role-badge.admin{
+  border-color:#c7d8e8;
+  background:#eef6fb;
+  color:#20506f;
+}
+
+.status-pill.active{
+  border-color:#bedfd6;
+  background:#d7f4ee;
+  color:var(--success);
+}
+
+.status-pill.disabled{
+  border-color:#f0c8c4;
+  background:var(--danger-soft);
+  color:var(--danger);
 }
 
 .profile-layout{
