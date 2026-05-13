@@ -103,7 +103,7 @@ $today = date('Y-m-d');
 
       <section class="card">
         <h2>Edit Student Form</h2>
-        <p>The visible Student ID can be updated, but the internal database ID remains unchanged.</p>
+        <p>Update the student's visible 10-digit school ID, profile details, and latest enrollment information.</p>
 
         <?php echo sms_flash_html(); ?>
 

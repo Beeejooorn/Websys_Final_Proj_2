@@ -14,7 +14,7 @@ function display_value($value, $fallback = 'Not recorded') {
 
 $enrollments = [];
 $enrollmentSql = "
-    SELECT enrollment_id, student_number, fullname, course_code, course_name, semester, grade, created_at, updated_at
+    SELECT student_number, fullname, course_code, course_name, semester, grade
     FROM v_enrollment_display
     ORDER BY enrollment_id DESC
 ";
@@ -71,29 +71,28 @@ if ($enrollmentResult) {
 
       <section class="card compact-card enrollment-records-card">
         <h2>Enrollment Records</h2>
-        <p>Saved academic enrollment details connected to registered student records.</p>
+        <p>Saved academic enrollment details connected to each student's visible school ID.</p>
 
         <div class="table-wrap">
           <table class="enrollment-table">
             <thead>
               <tr>
-                <th>Record</th>
+                <th>No.</th>
+                <th>Student ID</th>
                 <th>Student</th>
                 <th>Course</th>
                 <th>Semester</th>
                 <th>Grade</th>
-                <th>Created</th>
-                <th>Updated</th>
               </tr>
             </thead>
             <tbody>
               <?php if (!empty($enrollments)) { ?>
-                <?php foreach ($enrollments as $row) { ?>
+                <?php foreach ($enrollments as $index => $row) { ?>
                   <tr>
-                    <td><?php echo e($row['enrollment_id']); ?></td>
+                    <td><span class="display-number"><?php echo e(sprintf('%03d', $index + 1)); ?></span></td>
+                    <td><strong><?php echo e($row['student_number']); ?></strong></td>
                     <td>
                       <strong><?php echo e($row['fullname']); ?></strong>
-                      <small><?php echo e($row['student_number']); ?></small>
                     </td>
                     <td>
                       <strong><?php echo e($row['course_name']); ?></strong>
@@ -101,13 +100,11 @@ if ($enrollmentResult) {
                     </td>
                     <td><?php echo display_value($row['semester']); ?></td>
                     <td><?php echo display_value($row['grade'], 'N/A'); ?></td>
-                    <td><?php echo display_value($row['created_at']); ?></td>
-                    <td><?php echo display_value($row['updated_at']); ?></td>
                   </tr>
                 <?php } ?>
               <?php } else { ?>
                 <tr>
-                  <td colspan="7">No enrollment records found.</td>
+                  <td colspan="6">No enrollment records found.</td>
                 </tr>
               <?php } ?>
             </tbody>

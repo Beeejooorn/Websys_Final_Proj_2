@@ -1144,7 +1144,7 @@ tbody td small{
 }
 
 .enrollment-table{
-  min-width:1180px;
+  min-width:900px;
   table-layout:fixed;
 }
 
@@ -1155,44 +1155,55 @@ tbody td small{
 
 .enrollment-table thead th:nth-child(1),
 .enrollment-table tbody td:nth-child(1){
-  width:110px;
+  width:74px;
 }
 
 .enrollment-table thead th:nth-child(2),
 .enrollment-table tbody td:nth-child(2){
-  width:230px;
+  width:150px;
 }
 
 .enrollment-table thead th:nth-child(3),
 .enrollment-table tbody td:nth-child(3){
-  width:255px;
+  width:220px;
 }
 
 .enrollment-table thead th:nth-child(4),
 .enrollment-table tbody td:nth-child(4){
-  width:140px;
+  width:260px;
 }
 
 .enrollment-table thead th:nth-child(5),
 .enrollment-table tbody td:nth-child(5){
-  width:100px;
+  width:135px;
 }
 
 .enrollment-table thead th:nth-child(6),
 .enrollment-table tbody td:nth-child(6){
-  width:160px;
+  width:90px;
 }
 
-.enrollment-table thead th:nth-child(7),
-.enrollment-table tbody td:nth-child(7){
-  width:160px;
-}
-
+.enrollment-table thead th:nth-child(1),
+.enrollment-table tbody td:nth-child(1),
+.enrollment-table thead th:nth-child(2),
+.enrollment-table tbody td:nth-child(2),
 .enrollment-table thead th:nth-child(6),
-.enrollment-table tbody td:nth-child(6),
-.enrollment-table thead th:nth-child(7),
-.enrollment-table tbody td:nth-child(7){
+.enrollment-table tbody td:nth-child(6){
   white-space:nowrap;
+}
+
+.display-number{
+  display:inline-flex;
+  min-width:42px;
+  min-height:26px;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:var(--surface-muted);
+  color:var(--primary);
+  font-size:0.76rem;
+  font-weight:600;
+  letter-spacing:0;
 }
 
 .enrollment-table .inline-action-form{

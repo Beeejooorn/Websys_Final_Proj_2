@@ -105,7 +105,7 @@ $students = $stmt->get_result();
 
       <section class="card">
         <h2>Student Records</h2>
-        <p>Student ID shows the clean 10-digit school ID. Internal database IDs are used only behind the scenes.</p>
+        <p>Student ID shows the clean 10-digit school ID used for display and lookup.</p>
 
         <?php echo sms_flash_html(); ?>
 

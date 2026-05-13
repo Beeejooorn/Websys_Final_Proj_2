@@ -190,7 +190,7 @@ $today = date('Y-m-d');
 
       <section class="card">
         <h2>Student Registration Form</h2>
-        <p>Student ID is the visible 10-digit school ID. The internal database ID is generated automatically.</p>
+        <p>Student ID is the visible 10-digit school ID used on records, search, and enrollment lists.</p>
 
         <?php if ($message !== "") { ?>
           <p class="<?php echo e($messageType); ?>-message"><?php echo e($message); ?></p>
