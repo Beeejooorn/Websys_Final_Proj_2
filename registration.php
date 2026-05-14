@@ -159,7 +159,7 @@ $today = date('Y-m-d');
   <div class="portal">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">SMS</div>
+        <div class="brand-mark" aria-hidden="true">SMS</div>
         <h1>Student Management System</h1>
         <p>Student records workspace for academic operations.</p>
       </div>

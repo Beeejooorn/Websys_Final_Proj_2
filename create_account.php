@@ -115,7 +115,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $canCreateAdmin) {
   <main class="auth-page">
     <section class="auth-shell">
       <div class="auth-brand">
-        <div class="brand-mark">SMS</div>
+        <div class="brand-mark" aria-hidden="true">SMS</div>
         <div>
           <h1>Student Management System</h1>
           <p>Admin account setup</p>
@@ -181,9 +181,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $canCreateAdmin) {
   <div class="portal">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">SMS</div>
+        <div class="brand-mark" aria-hidden="true">SMS</div>
         <div>
-          <h2>Student Management System</h2>
+          <h1>Student Management System</h1>
           <p>Student records workspace for academic operations.</p>
         </div>
       </div>
@@ -204,13 +204,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $canCreateAdmin) {
     </aside>
 
     <main class="main">
-      <section class="topbar">
-        <div>
-          <h1>Create Admin Account</h1>
+      <header class="topbar">
+        <div class="page-intro">
+          <h2>Create Admin Account</h2>
           <p>Only super admins can create additional admin accounts.</p>
         </div>
         <span class="topbar-badge">Admin Management</span>
-      </section>
+      </header>
 
       <section class="card">
         <h2>Create New Admin</h2>

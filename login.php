@@ -117,7 +117,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
   <main class="auth-page">
     <section class="auth-shell">
       <div class="auth-brand">
-        <div class="brand-mark">SMS</div>
+        <div class="brand-mark" aria-hidden="true">SMS</div>
         <div>
           <h1>Student Management System</h1>
           <p>Admin access portal</p>

@@ -133,6 +133,15 @@ textarea{
   letter-spacing:0;
 }
 
+.brand h2{
+  max-width:155px;
+  color:var(--primary);
+  font-size:1rem;
+  font-weight:600;
+  line-height:1.18;
+  letter-spacing:0;
+}
+
 .brand p{
   grid-column:2;
   margin-top:4px;
@@ -307,12 +316,23 @@ textarea{
 .form-section,
 .info-tile,
 .info-box,
-.meta-row{
+.meta-row,
+.auth-card{
   min-width:0;
   background:var(--surface);
   border:1px solid var(--line);
   border-radius:var(--radius-lg);
   box-shadow:none;
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease, background-color .18s ease;
+}
+
+.card:hover,
+.summary-card:hover,
+.form-section:hover,
+.info-tile:hover,
+.info-box:hover,
+.meta-row:hover{
+  border-color:#cfd8d5;
 }
 
 .main > .card{
@@ -585,6 +605,10 @@ form{
   grid-column:1 / -1;
 }
 
+.form-group.full-span{
+  grid-column:1 / -1;
+}
+
 label{
   color:#5d6966;
   font-size:0.72rem;
@@ -635,6 +659,19 @@ textarea:focus{
   border-color:var(--primary);
   background-color:var(--surface);
   box-shadow:0 0 0 3px rgba(0,63,53,0.09);
+}
+
+button:focus-visible,
+.btn:focus-visible,
+.nav-links a:focus-visible,
+a:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(0,63,53,0.12);
+}
+
+.nav-links a:focus-visible{
+  border-color:var(--primary-soft);
+  background:var(--surface-muted);
 }
 
 .form-section{
@@ -696,6 +733,10 @@ form > .button-row{
 
 .btn:hover{
   transform:translateY(-1px);
+}
+
+.btn:active{
+  transform:translateY(0);
 }
 
 .btn-primary{
@@ -1517,6 +1558,12 @@ tbody td small{
   margin-top:4px;
 }
 
+.admin-table .topbar-badge{
+  min-height:28px;
+  padding:5px 10px;
+  font-size:0.68rem;
+}
+
 .footer-note{
   margin-top:24px;
   color:var(--muted);
@@ -1612,6 +1659,20 @@ tbody td small{
 .auth-actions .btn{
   flex:1;
   justify-content:center;
+}
+
+.auth-card .topbar-badge{
+  background:var(--surface-soft);
+  border-color:var(--line-soft);
+  color:var(--primary);
+}
+
+.auth-card-header h2{
+  max-width:24ch;
+}
+
+.auth-card-header p{
+  max-width:38ch;
 }
 
 .auth-switch{
