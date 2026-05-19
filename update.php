@@ -168,10 +168,10 @@ try {
     $conn->commit();
 
     sms_log_activity($conn, "student_updated", "Updated student " . $studentNumber . " and enrollment details.", sms_current_admin_id());
-    sms_set_flash("success", "Student updated successfully.");
+    sms_set_flash("success", "Student updated successfully. Enrollment details were saved.");
     sms_redirect("students.php");
 } catch (Exception $error) {
     $conn->rollback();
-    redirect_update_error($studentId, sms_duplicate_message_from_error($error->getMessage(), "Unable to update student. No changes were saved."));
+    redirect_update_error($studentId, sms_duplicate_message_from_error($error->getMessage(), "Database action failed. Unable to update student. No changes were saved."));
 }
 ?>

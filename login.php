@@ -29,10 +29,22 @@ $queryMessage = $_GET['message'] ?? '';
 if ($queryMessage === 'logout_success') {
     $message = "Logout successful.";
     $messageType = "success";
+} elseif ($queryMessage === 'login_required') {
+    $message = "Please log in before accessing the Student Management System.";
+    $messageType = "warning";
+} elseif ($queryMessage === 'session_expired') {
+    $message = "Your session has expired. Please log in again.";
+    $messageType = "warning";
 } elseif ($queryMessage === 'account_disabled') {
     $message = "This admin account is disabled.";
 } elseif ($queryMessage === 'account_locked') {
     $message = "This admin account is temporarily locked. Please try again later.";
+}
+
+$flash = sms_get_flash();
+if ($flash) {
+    $message = $flash['message'];
+    $messageType = $flash['type'];
 }
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {

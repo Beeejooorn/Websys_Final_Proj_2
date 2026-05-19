@@ -53,7 +53,7 @@ try {
     sms_set_flash("success", "Student deleted successfully.");
 } catch (Exception $exception) {
     $conn->rollback();
-    sms_set_flash("error", "Unable to delete student. No records were changed.");
+    sms_set_flash("error", "Student delete failed. No records were changed.");
 }
 
 sms_redirect("students.php");

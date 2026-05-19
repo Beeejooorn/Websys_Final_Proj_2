@@ -45,6 +45,12 @@ if (!$isFirstSetup && !$currentAdmin) {
     $messageType = "info";
 }
 
+$flash = sms_get_flash();
+if ($flash) {
+    $message = $flash['message'];
+    $messageType = $flash['type'];
+}
+
 if ($_SERVER["REQUEST_METHOD"] === "POST" && $canCreateAdmin) {
     $username = trim($_POST['username'] ?? '');
     $email = strtolower(trim($_POST['email'] ?? ''));
@@ -85,7 +91,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && $canCreateAdmin) {
 
         if ($stmt && $stmt->execute()) {
             $newAdminId = $stmt->insert_id;
-            $message = $isFirstSetup ? "Super admin account created successfully. You can now log in." : "Admin created successfully.";
+            $message = $isFirstSetup ? "Admin account created successfully. You can now log in." : "Admin account created successfully.";
             $messageType = "success";
             $adminCount++;
             $isFirstSetup = false;

@@ -88,9 +88,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if ($updateStmt->execute()) {
                     $_SESSION['username'] = $newUsername;
                     sms_log_activity($conn, "admin_updated", "Updated own admin username.", $adminId);
-                    $messages['username'] = ['type' => 'success', 'text' => 'Admin updated successfully.'];
+                    $messages['username'] = ['type' => 'success', 'text' => 'Admin profile updated successfully.'];
                 } else {
-                    $messages['username'] = ['type' => 'error', 'text' => 'Unable to update username.'];
+                    $messages['username'] = ['type' => 'error', 'text' => 'Admin profile update failed. Please try again.'];
                 }
 
                 $updateStmt->close();
@@ -120,9 +120,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if ($updateStmt->execute()) {
                     $_SESSION['admin_email'] = $newEmail;
                     sms_log_activity($conn, "admin_updated", "Updated own admin email.", $adminId);
-                    $messages['email'] = ['type' => 'success', 'text' => 'Admin updated successfully.'];
+                    $messages['email'] = ['type' => 'success', 'text' => 'Admin profile updated successfully.'];
                 } else {
-                    $messages['email'] = ['type' => 'error', 'text' => 'Unable to update email.'];
+                    $messages['email'] = ['type' => 'error', 'text' => 'Admin profile update failed. Please try again.'];
                 }
 
                 $updateStmt->close();
@@ -150,9 +150,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             if ($passwordStmt->execute()) {
                 sms_log_activity($conn, "admin_updated", "Updated own admin password.", $adminId);
-                $messages['password'] = ['type' => 'success', 'text' => 'Admin updated successfully.'];
+                $messages['password'] = ['type' => 'success', 'text' => 'Admin password changed successfully.'];
             } else {
-                $messages['password'] = ['type' => 'error', 'text' => 'Unable to update password.'];
+                $messages['password'] = ['type' => 'error', 'text' => 'Password change failed. Please try again.'];
             }
 
             $passwordStmt->close();
@@ -248,6 +248,8 @@ if ($admin['role'] === 'super_admin') {
         </div>
         <div class="topbar-badge">Admin Account</div>
       </header>
+
+      <?php echo sms_flash_html(); ?>
 
       <section class="profile-layout">
         <aside class="card profile-card">

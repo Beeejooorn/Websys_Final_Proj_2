@@ -5,7 +5,7 @@ include_once 'validation_helpers.php';
 sms_start_session();
 
 if (empty($_SESSION['admin_id'])) {
-    sms_redirect("login.php");
+    sms_redirect("login.php?message=login_required");
 }
 
 $currentAdmin = sms_load_admin_by_id($conn, (int)$_SESSION['admin_id']);
@@ -13,7 +13,7 @@ $currentAdmin = sms_load_admin_by_id($conn, (int)$_SESSION['admin_id']);
 if (!$currentAdmin) {
     session_unset();
     session_destroy();
-    sms_redirect("login.php");
+    sms_redirect("login.php?message=session_expired");
 }
 
 if ($currentAdmin['status'] !== 'active') {

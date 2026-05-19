@@ -131,12 +131,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $conn->commit();
 
                     sms_log_activity($conn, "student_created", "Created student " . $old['student_number'] . " and initial enrollment.", sms_current_admin_id());
-                    $message = "Student created successfully and initial enrollment was saved.";
+                    $message = "Student added successfully. Initial enrollment was also saved.";
                     $messageType = "success";
                     $old = [];
                 } catch (Exception $exception) {
                     $conn->rollback();
-                    $message = sms_duplicate_message_from_error($exception->getMessage(), "Registration failed. No student record was saved. Please check the form and try again.");
+                    $message = sms_duplicate_message_from_error($exception->getMessage(), "Database action failed. Registration was not saved. Please check the form and try again.");
                     $messageType = "error";
                 }
             }
@@ -191,6 +191,8 @@ $today = date('Y-m-d');
       <section class="card">
         <h2>Student Registration Form</h2>
         <p>Student ID is the visible 10-digit school ID used on records, search, and enrollment lists.</p>
+
+        <?php echo sms_flash_html(); ?>
 
         <?php if ($message !== "") { ?>
           <p class="<?php echo e($messageType); ?>-message"><?php echo e($message); ?></p>

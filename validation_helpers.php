@@ -134,7 +134,8 @@ function sms_flash_html() {
     }
 
     $class = $flash['type'] . '-message';
-    return '<p class="' . sms_escape($class) . '">' . sms_escape($flash['message']) . '</p>';
+    $role = $flash['type'] === 'error' ? 'alert' : 'status';
+    return '<div class="' . sms_escape($class) . '" role="' . sms_escape($role) . '">' . sms_escape($flash['message']) . '</div>';
 }
 
 function sms_redirect($url) {
@@ -220,6 +221,10 @@ function sms_duplicate_message_from_error($errorMessage, $fallback = 'A duplicat
 
     if (strpos($message, 'email') !== false) {
         return 'That email address already exists. Please use another Gmail address.';
+    }
+
+    if (strpos($message, 'username') !== false) {
+        return 'That username already exists. Please choose a different username.';
     }
 
     if (strpos($message, 'course_name') !== false) {

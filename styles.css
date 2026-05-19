@@ -1697,10 +1697,13 @@ tbody td small{
   padding:12px 14px;
   border-radius:8px;
   font-weight:600;
+  line-height:1.45;
+  box-shadow:0 10px 22px rgba(0, 68, 54, 0.05);
 }
 
 .error-message{
   border:1px solid #f0c8c4;
+  border-left:4px solid var(--danger);
   background:var(--danger-soft);
   color:var(--danger);
 }
@@ -1708,18 +1711,21 @@ tbody td small{
 .success-message,
 .form-message{
   border:1px solid #bfd9d2;
+  border-left:4px solid var(--primary);
   background:var(--primary-soft);
   color:var(--primary);
 }
 
 .warning-message{
   border:1px solid #ead8ad;
+  border-left:4px solid var(--warning);
   background:#fff6df;
   color:var(--warning);
 }
 
 .info-message{
   border:1px solid #c7d8e8;
+  border-left:4px solid #2d7199;
   background:#eef6fb;
   color:#20506f;
 }
